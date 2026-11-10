@@ -2,3 +2,26 @@
 .venv/
 __pycache__/
 
+/build/
+.lake/
+build/
+
+# Lean compilation outputs
+*.olean
+*.ilean
+*.trace
+
+# DevContainer build cache
+.devcontainer/.cache/
+
+# OS-specific files
+.DS_Store
+Thumbbs.db
+
+# Editor files
+*~
+*.swp
+*.bak
+
+# Log files
+*.log
