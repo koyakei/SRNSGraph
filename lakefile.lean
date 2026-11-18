@@ -1,15 +1,16 @@
 import Lake
 open Lake DSL
 
-package «lean4-project» where
+package «srnsgraph» where
   leanOptions := #[
     -- Enable well-founded recursion default (useful for dependent types)
     ⟨`autoImplicit, false⟩
   ]
 
-lean_lib «Lean4Project» where
-  -- add library configuration options here
+lean_lib «Basic» where
+  srcDir := "proofs"
 
 @[default_target]
-lean_exe «lean4-project» where
-  root := `Main
+lean_exe «basic» where
+  root := `Basic
+  srcDir := "proofs"
