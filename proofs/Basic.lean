@@ -715,18 +715,6 @@ theorem narrative_and_law_unlock_cognition
   dsimp [c_unlocked, c_law_only]
   omega
 
-/-- 社会決定手段の進化 8 段階 -/
-inductive InstitutionStage where
-  | stage1_violence               -- 1. 物理：暴力・格闘力
-  | stage2_kinship                -- 2. 生物：遺伝子・血縁
-  | stage3_ritual                 -- 3. 象徴：踊り・歌・儀式
-  | stage4_narrative              -- 4. 理念：物語・宗教
-  | stage5_written_law            -- 5. 規範：文字・法律
-  | stage6_market_voting          -- 6. 評価：多数決・通貨
-  | stage7_meta_competition       -- 7. メタ：決定手段の管理者間競争
-  | stage8_algorithmic_governance -- 8. その先：動的ルール選択
-  deriving Repr, DecidableEq
-
 /-- 段階移行における総余剰と認知・インフラコストの比較パラメータ -/
 structure StageTransitionParams where
   V_simple          : Int  -- 現在の単純段階が生む余剰
@@ -858,7 +846,7 @@ def sampleStage8RolePayoffs : RolePayoffs where
   cur := 50
   adm := 40
 -- ============================================================================
--- セクション 7: アーカイブ長 L・情報劣化率 \lambda_{deg} と Stage 8 の資本主義超克定理
+-- セクション 7: 評価保存能力・情報劣化率による動的ガバナンス相転移と資本主義超克定理
 -- ============================================================================
 
 /-- 高度ガバナンス進化パラメータ（アーカイブ長・劣化率・検証可能性・包摂性） -/
@@ -877,100 +865,220 @@ structure AdvancedGovernanceParams where
     capitalistRent ≥ 0 ∧ algorithmicSurplus ≥ 0
   deriving Repr
 
-/--
-  【定義 7.1】アーカイブ長 L と情報劣化率 \lambda_{deg} に基づく制度段階の実現可能性述語
-  - Stage 1〜2（暴力・血縁）: 外部記録 L = 0 でも機能する原始的均衡
-  - Stage 3〜4（儀式・物語）: 記憶の反復（L > 0）を要するが、高い劣化率（口伝の変容）を許容
-  - Stage 5（文字・法治国家）: 成文法アーカイブ（L ≥ 10）と低劣化（degRate ≤ 30）を要求
-  - Stage 6（資本主義・評価移転）: 市場価格・信用履歴の蓄積（L ≥ 50）と低劣化（degRate ≤ 15）を要求
-  - Stage 7（メタ競争）: 複数プロトコル比較のための長期履歴（L ≥ 100）を要求
-  - Stage 8（アルゴリズム統治）: 長期不変ログ（L ≥ 100）かつゼロに近い劣化（degRate ≤ 5）と高検証性を要求
--/
-def isStageFeasible (stage : InstitutionStage) (p : AdvancedGovernanceParams) : Prop :=
-  match stage with
-  | .stage1_violence               => True
-  | .stage2_kinship                => True
-  | .stage3_ritual                 => p.L > 0
-  | .stage4_narrative              => p.L > 0 ∧ p.degRate ≤ 60
-  | .stage5_written_law            => p.L ≥ 10 ∧ p.degRate ≤ 30
-  | .stage6_market_voting          => p.L ≥ 50 ∧ p.degRate ≤ 15
-  | .stage7_meta_competition       => p.L ≥ 100 ∧ p.degRate ≤ 10
-  | .stage8_algorithmic_governance =>
-      p.L ≥ 100 ∧ p.degRate ≤ 5 ∧ p.verifiability ≥ 80 ∧ p.inclusivity ≥ 80
+-- ----------------------------------------------------------------------------
+-- 各ガバナンス形態の独立成立条件述語（固定ステージを排した不等式条件）
+-- ----------------------------------------------------------------------------
 
-/--
-  【定理 7.1】情報劣化率 \lambda_{deg} の上昇による高度制度（Stage 5〜8）の崩壊と原始回帰:
-  アーカイブ長 L が十分であっても、情報劣化率 degRate が臨界値（30超）に達すると、
-  文字・法治国家（Stage 5）や資本主義（Stage 6）、アルゴリズム統治（Stage 8）は
-  すべて実現不可能となり、社会は物語・儀式・暴力段階への退行を強いられる。
--/
-theorem high_degradation_blocks_modern_and_algorithmic_stages
-    (p : AdvancedGovernanceParams)
-    (h_high_deg : p.degRate > 30) :
-    ¬ isStageFeasible .stage5_written_law p ∧
-    ¬ isStageFeasible .stage6_market_voting p ∧
-    ¬ isStageFeasible .stage8_algorithmic_governance p := by
-  unfold isStageFeasible
-  omega
+/-- ① 物理・暴力支配の成立述語: 外部記録 L=0 でも常に成立する基底状態 -/
+def isViolenceFeasible (_p : AdvancedGovernanceParams) : Prop := True
 
-/--
-  【定義 7.2】資本主義的評価体制（Stage 6）の社会純余剰関数:
-  基本システム効用（基準値 100）から、市場独占・情報の非対称性に伴うレント搾取コスト
-  `capitalistRent` および情報劣化損失 `degRate` を差し引いた純厚生。
-  （※ 検証可能性・包摂性の欠如により、独占レントの抑制と劣化損失の回復ができない構造を表す）
--/
-def netPayoffCapitalism (p : AdvancedGovernanceParams) : Int :=
+/-- ② 理念・物語（口伝）統治の成立述語: 記憶の反復 L > 0 を要するが、高い劣化率 (≤ 60) を許容 -/
+def isNarrativeFeasible (p : AdvancedGovernanceParams) : Prop :=
+  p.L > 0 ∧ p.degRate ≤ 60
+
+/-- ③ 規範・成文法（法治国家）統治の成立述語: 成文アーカイブ L ≥ 10 と一定の低劣化 (degRate ≤ 30) を要求 -/
+def isRuleOfLawFeasible (p : AdvancedGovernanceParams) : Prop :=
+  p.L ≥ 10 ∧ p.degRate ≤ 30
+
+/-- ④ 評価・市場投票（資本主義）統治の成立述語: 信用履歴 L ≥ 50 と低劣化 (degRate ≤ 15) を要求 -/
+def isMarketFeasible (p : AdvancedGovernanceParams) : Prop :=
+  p.L ≥ 50 ∧ p.degRate ≤ 15
+
+/-- ⑤ 自律調停・暗号学的検証可能アルゴリズム統治の成立述語:
+    長期不変ログ L ≥ 100, 超低劣化 degRate ≤ 5, 高検証性 ν ≥ 80, 高包摂性 α_trans ≥ 80 を要求 -/
+def isAlgorithmicGovernanceFeasible (p : AdvancedGovernanceParams) : Prop :=
+  p.L ≥ 100 ∧ p.degRate ≤ 5 ∧ p.verifiability ≥ 80 ∧ p.inclusivity ≥ 80
+
+-- ----------------------------------------------------------------------------
+-- パラメータの関数として表現された各ガバナンス形態の社会純厚生関数
+-- ----------------------------------------------------------------------------
+
+/-- 暴力・物理支配の社会純厚生（基礎秩序値） -/
+def welfareViolence (_p : AdvancedGovernanceParams) : Int := 20
+
+/-- 口伝・物語統治の社会純厚生（共有神話による協調 45 から情報風化損失を控除） -/
+def welfareNarrative (p : AdvancedGovernanceParams) : Int :=
+  45 - p.degRate / 2
+
+/-- 成文法・法治統治の社会純厚生（法秩序による協調余剰 65 から条文形骸化損失を控除） -/
+def welfareRuleOfLaw (p : AdvancedGovernanceParams) : Int :=
+  65 - p.degRate
+
+/-- 資本主義・市場評価統治の社会純厚生（市場余剰 100 から独占レント搾取と劣化損失を控除） -/
+def welfareMarket (p : AdvancedGovernanceParams) : Int :=
   100 - p.capitalistRent - p.degRate
 
-/--
-  【定義 7.3】検証可能なアルゴリズム統治体制（Stage 8）の社会純余剰関数:
-  基本システム効用（基準値 100）に、アルゴリズム統治の摩擦軽減・公正分配余剰
-  `algorithmicSurplus` および検証可能性 `\nu` と包摂的透明性 `\alpha_{trans}` が生む
-  協調信頼ボーナス `(verifiability + inclusivity) / 2` を加え、情報劣化コスト `2 * degRate`
-  （暗号学的整合性維持コストを含むペナルティ）を差し引いた純厚生。
--/
-def netPayoffAlgorithmic (p : AdvancedGovernanceParams) : Int :=
+/-- アルゴリズム統治の社会純厚生（分配余剰＋検証性・包摂性信頼ボーナスから不整合ペナルティを控除） -/
+def welfareAlgorithmic (p : AdvancedGovernanceParams) : Int :=
   100 + p.algorithmicSurplus + (p.verifiability + p.inclusivity) / 2 - 2 * p.degRate
 
+-- 後方互換性エイリアス
+def netPayoffCapitalism (p : AdvancedGovernanceParams) : Int := welfareMarket p
+def netPayoffAlgorithmic (p : AdvancedGovernanceParams) : Int := welfareAlgorithmic p
+
+-- ----------------------------------------------------------------------------
+-- 連続的パラメータ変動による動的相転移定理群
+-- ----------------------------------------------------------------------------
+
 /--
-  【定理 7.2】Stage 8（検証可能アルゴリズム統治）による資本主義的評価（Stage 6）の厳密超克定理:
-  暗号学的検証可能性 \nu と包摂的透明性 \alpha_{trans} が十分に高く（例: \nu ≥ 80, \alpha_{trans} ≥ 80）、
-  かつ不変アーカイブによって情報劣化率 \lambda_{deg} がゼロに近づく（degRate ≤ 5）とき、
-  資本主義的評価が抱えるレント搾取コスト（capitalistRent > 0）をアルゴリズム統治の余剰と
-  信頼ボーナスが完全に上回り、Stage 8 の社会厚生は Stage 6 を厳密に凌駕する。
+  【定理 7.1】情報劣化率 \lambda_{deg} の連続的上昇による段階的崩壊・原始退行の連鎖定理:
+  アーカイブ長 L が十分であっても、情報劣化率 degRate が 30 を超えると、
+  成文法・法治（Rule of Law）、市場・資本主義（Market）、アルゴリズム統治（Algorithmic）は
+  すべて実現不可能となる。
+-/
+theorem degradation_cascade_collapse
+    (p : AdvancedGovernanceParams)
+    (h_deg : p.degRate > 30) :
+    ¬ isRuleOfLawFeasible p ∧
+    ¬ isMarketFeasible p ∧
+    ¬ isAlgorithmicGovernanceFeasible p := by
+  unfold isRuleOfLawFeasible isMarketFeasible isAlgorithmicGovernanceFeasible
+  refine ⟨?_, ?_, ?_⟩
+  · rintro ⟨_, h⟩; omega
+  · rintro ⟨_, h⟩; omega
+  · rintro ⟨_, h, _, _⟩; omega
+
+/--
+  【定理 7.2】極限劣化（degRate > 60）における完全な暴力支配への退行定理:
+  情報劣化率が口伝の許容限界（60）すら突破すると、物語統治すら崩壊し、
+  一切の記録や制度に依存しない暴力均衡のみが成立可能な状態となる。
+-/
+theorem extreme_degradation_regresses_to_violence_only
+    (p : AdvancedGovernanceParams)
+    (h_extreme : p.degRate > 60) :
+    ¬ isNarrativeFeasible p ∧
+    ¬ isRuleOfLawFeasible p ∧
+    ¬ isMarketFeasible p ∧
+    ¬ isAlgorithmicGovernanceFeasible p ∧
+    isViolenceFeasible p := by
+  unfold isNarrativeFeasible isRuleOfLawFeasible isMarketFeasible isAlgorithmicGovernanceFeasible isViolenceFeasible
+  refine ⟨?_, ?_, ?_, ?_, trivial⟩
+  · rintro ⟨_, h⟩; omega
+  · rintro ⟨_, h⟩; omega
+  · rintro ⟨_, h⟩; omega
+  · rintro ⟨_, h, _, _⟩; omega
+
+/--
+  【定理 7.3】アーカイブ長 L の伸長に伴う動的ガバナンス様式の連続解禁定理:
+  情報劣化が低く検証性が担保された環境下で、記録蓄積量 L が閾値（10, 50, 100）を突破するごとに
+  法治、市場、アルゴリズム統治が自発的に解禁されていく動的相転移のプロセス。
+-/
+theorem archive_growth_enables_higher_governance
+    (p : AdvancedGovernanceParams)
+    (h_low_deg : p.degRate ≤ 5)
+    (h_high_verif : p.verifiability ≥ 80)
+    (h_high_incl : p.inclusivity ≥ 80) :
+    (p.L < 10 → ¬ isRuleOfLawFeasible p ∧ ¬ isMarketFeasible p ∧ ¬ isAlgorithmicGovernanceFeasible p) ∧
+    (p.L ≥ 10 → isRuleOfLawFeasible p) ∧
+    (p.L ≥ 50 → isMarketFeasible p) ∧
+    (p.L ≥ 100 → isAlgorithmicGovernanceFeasible p) := by
+  unfold isRuleOfLawFeasible isMarketFeasible isAlgorithmicGovernanceFeasible
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · intro hL
+    refine ⟨?_, ?_, ?_⟩
+    · rintro ⟨h, _⟩; omega
+    · rintro ⟨h, _⟩; omega
+    · rintro ⟨h, _, _, _⟩; omega
+  · intro hL; exact ⟨hL, by omega⟩
+  · intro hL; exact ⟨hL, by omega⟩
+  · intro hL; exact ⟨hL, h_low_deg, h_high_verif, h_high_incl⟩
+
+/--
+  【定理 7.4】検証可能アルゴリズム統治による資本主義的評価（市場）の厳密超克定理:
+  暗号学的検証可能性 \nu と包摂的透明性 \alpha_{trans} が十分に高く（\nu ≥ 80, \alpha_{trans} ≥ 80）、
+  低劣化（degRate ≤ 5）ならば、アルゴリズム統治の社会純厚生は資本主義的評価を厳密に凌駕する。
 -/
 theorem algorithmic_governance_surpasses_capitalism
     (p : AdvancedGovernanceParams)
     (h_verif_high : p.verifiability ≥ 80)
     (h_incl_high  : p.inclusivity ≥ 80)
     (h_low_deg    : p.degRate ≤ 5) :
-    netPayoffAlgorithmic p > netPayoffCapitalism p := by
-  unfold netPayoffAlgorithmic netPayoffCapitalism
+    welfareAlgorithmic p > welfareMarket p := by
+  unfold welfareAlgorithmic welfareMarket
   have ⟨⟨h_deg_nonneg, _⟩, _, _, h_rent_nonneg, h_surplus_nonneg⟩ := p.h_bounds
   omega
 
 /--
-  【定理 7.3】資本主義のレント搾取ゼロ（完全競争の理想極限）であってもなお成立する優位性:
+  【定理 7.5】資本主義のレント搾取ゼロ（完全競争極限）であってもなお成立する優位性:
   仮に資本主義的評価がレント搾取を完全に排除した理想状態（capitalistRent = 0）であっても、
-  検証可能性と包摂性が十分高く（verifiability + inclusivity ≥ 20）、劣化率が低い（degRate ≤ 5）
-  ならば、アルゴリズム統治による協調分配余剰により Stage 8 は依然として Stage 6 を厳密に凌駕する。
+  信頼ボーナスと協調分配余剰によりアルゴリズム統治は依然として市場評価を厳密に凌駕する。
 -/
 theorem algorithmic_surpasses_even_ideal_zero_rent_capitalism
     (p : AdvancedGovernanceParams)
     (_h_zero_rent : p.capitalistRent = 0)
     (h_trust_sum  : p.verifiability + p.inclusivity ≥ 20)
     (h_low_deg    : p.degRate ≤ 5) :
-    netPayoffAlgorithmic p > netPayoffCapitalism p := by
-  unfold netPayoffAlgorithmic netPayoffCapitalism
+    welfareAlgorithmic p > welfareMarket p := by
+  unfold welfareAlgorithmic welfareMarket
   have ⟨_, _, _, _, h_surplus_nonneg⟩ := p.h_bounds
   omega
 
--- ============================================================================
--- セクション 7 の検証用インスタンスと decide による具象証明
--- ============================================================================
+/--
+  【定理 7.6】全ガバナンス体制に対するアルゴリズム統治の最適性（Max Welfare）定理:
+  保存能力と検証性が整った環境において、アルゴリズム統治は市場・法治・物語・暴力の
+  すべてのガバナンス形態の社会純厚生を同時にかつ厳密に凌駕する。
+-/
+theorem algorithmic_surpasses_all_modes
+    (p : AdvancedGovernanceParams)
+    (h_verif_high : p.verifiability ≥ 80)
+    (h_incl_high  : p.inclusivity ≥ 80)
+    (h_low_deg    : p.degRate ≤ 5) :
+    welfareAlgorithmic p > welfareMarket p ∧
+    welfareAlgorithmic p > welfareRuleOfLaw p ∧
+    welfareAlgorithmic p > welfareNarrative p ∧
+    welfareAlgorithmic p > welfareViolence p := by
+  unfold welfareAlgorithmic welfareMarket welfareRuleOfLaw welfareNarrative welfareViolence
+  have ⟨⟨h_deg_nonneg, _⟩, _, _, h_rent_nonneg, h_surplus_nonneg⟩ := p.h_bounds
+  omega
 
-/-- Stage 8 の条件を満たす具象パラメータ例 -/
-def sampleStage8Advanced : AdvancedGovernanceParams where
+/--
+  【定理 7.7】情報劣化・改ざんの激化に伴う厚生の自発的逆転（Phase Inversion）定理:
+  情報劣化率 degRate が臨界値（アルゴリズム余剰＋信頼ボーナス＋35）を超えて悪化すると、
+  暗号不整合ペナルティの膨張により、アルゴリズム統治の純厚生はより単純な成文法治を下回る。
+-/
+theorem degradation_inverts_algorithmic_vs_law
+    (p : AdvancedGovernanceParams)
+    (h_deg_rise : p.degRate > p.algorithmicSurplus + (p.verifiability + p.inclusivity) / 2 + 35) :
+    welfareRuleOfLaw p > welfareAlgorithmic p := by
+  unfold welfareRuleOfLaw welfareAlgorithmic
+  omega
+
+-- ----------------------------------------------------------------------------
+-- 具象パラメータ系列による動的相転移シナリオと自動証明 (decide)
+-- ----------------------------------------------------------------------------
+
+/-- ① 原始・高劣化環境: 暴力支配のみが成立し最大厚生 -/
+def sampleEnvPrimitive : AdvancedGovernanceParams where
+  L := 0
+  degRate := 85
+  verifiability := 0
+  inclusivity := 0
+  capitalistRent := 0
+  algorithmicSurplus := 0
+  h_bounds := by decide
+
+/-- ② 成文法治環境: 記録の蓄積により法治が解禁され、暴力を上回る -/
+def sampleEnvRuleOfLaw : AdvancedGovernanceParams where
+  L := 25
+  degRate := 20
+  verifiability := 20
+  inclusivity := 30
+  capitalistRent := 15
+  algorithmicSurplus := 10
+  h_bounds := by decide
+
+/-- ③ 市場・資本主義環境: 信用履歴の蓄積と市場取引により市場が解禁され、法治を上回る -/
+def sampleEnvMarket : AdvancedGovernanceParams where
+  L := 60
+  degRate := 12
+  verifiability := 50
+  inclusivity := 50
+  capitalistRent := 20
+  algorithmicSurplus := 20
+  h_bounds := by decide
+
+/-- ④ アルゴリズム統治環境: 不変アーカイブと暗号検証によりアルゴリズム統治が解禁され全体制を圧倒 -/
+def sampleEnvAlgorithmic : AdvancedGovernanceParams where
   L := 1000
   degRate := 2
   verifiability := 95
@@ -979,11 +1087,54 @@ def sampleStage8Advanced : AdvancedGovernanceParams where
   algorithmicSurplus := 40
   h_bounds := by decide
 
-/-- 具象インスタンスにおいて Stage 8 が実現可能かつ Stage 6 を凌駕することの自動証明 -/
+/-- 後方互換用インスタンス -/
+def sampleStage8Advanced : AdvancedGovernanceParams := sampleEnvAlgorithmic
+
+/-- 具象証明 ①: 原始環境における暴力単独成立と厚生最大性の自動証明 -/
+theorem sample_primitive_phase :
+    isViolenceFeasible sampleEnvPrimitive ∧
+    ¬ isNarrativeFeasible sampleEnvPrimitive ∧
+    ¬ isRuleOfLawFeasible sampleEnvPrimitive ∧
+    ¬ isMarketFeasible sampleEnvPrimitive ∧
+    ¬ isAlgorithmicGovernanceFeasible sampleEnvPrimitive ∧
+    welfareViolence sampleEnvPrimitive > welfareRuleOfLaw sampleEnvPrimitive ∧
+    welfareViolence sampleEnvPrimitive > welfareMarket sampleEnvPrimitive := by
+  unfold isViolenceFeasible isNarrativeFeasible isRuleOfLawFeasible isMarketFeasible isAlgorithmicGovernanceFeasible
+  unfold welfareViolence welfareRuleOfLaw welfareMarket
+  decide
+
+/-- 具象証明 ②: 法治環境における法治解禁と暴力超克の自動証明 -/
+theorem sample_rule_of_law_phase :
+    isRuleOfLawFeasible sampleEnvRuleOfLaw ∧
+    ¬ isMarketFeasible sampleEnvRuleOfLaw ∧
+    ¬ isAlgorithmicGovernanceFeasible sampleEnvRuleOfLaw ∧
+    welfareRuleOfLaw sampleEnvRuleOfLaw > welfareViolence sampleEnvRuleOfLaw := by
+  unfold isRuleOfLawFeasible isMarketFeasible isAlgorithmicGovernanceFeasible welfareRuleOfLaw welfareViolence
+  decide
+
+/-- 具象証明 ③: 市場環境における市場解禁と法治超克の自動証明 -/
+theorem sample_market_phase :
+    isMarketFeasible sampleEnvMarket ∧
+    ¬ isAlgorithmicGovernanceFeasible sampleEnvMarket ∧
+    welfareMarket sampleEnvMarket > welfareRuleOfLaw sampleEnvMarket ∧
+    welfareMarket sampleEnvMarket > welfareViolence sampleEnvMarket := by
+  unfold isMarketFeasible isAlgorithmicGovernanceFeasible welfareMarket welfareRuleOfLaw welfareViolence
+  decide
+
+/-- 具象証明 ④: アルゴリズム統治環境における解禁と全体制圧倒の自動証明 -/
+theorem sample_algorithmic_phase :
+    isAlgorithmicGovernanceFeasible sampleEnvAlgorithmic ∧
+    welfareAlgorithmic sampleEnvAlgorithmic > welfareMarket sampleEnvAlgorithmic ∧
+    welfareAlgorithmic sampleEnvAlgorithmic > welfareRuleOfLaw sampleEnvAlgorithmic ∧
+    welfareAlgorithmic sampleEnvAlgorithmic > welfareViolence sampleEnvAlgorithmic := by
+  unfold isAlgorithmicGovernanceFeasible welfareAlgorithmic welfareMarket welfareRuleOfLaw welfareViolence
+  decide
+
+/-- 後方互換用証明 -/
 theorem sample_stage8_feasible_and_dominant :
-    isStageFeasible .stage8_algorithmic_governance sampleStage8Advanced ∧
-    netPayoffAlgorithmic sampleStage8Advanced > netPayoffCapitalism sampleStage8Advanced := by
-  unfold isStageFeasible netPayoffAlgorithmic netPayoffCapitalism
+    isAlgorithmicGovernanceFeasible sampleStage8Advanced ∧
+    welfareAlgorithmic sampleStage8Advanced > welfareMarket sampleStage8Advanced := by
+  unfold isAlgorithmicGovernanceFeasible welfareAlgorithmic welfareMarket
   decide
 
 -- ============================================================================
@@ -1029,11 +1180,14 @@ def main : IO Unit := do
   IO.println s!"        段階進化純余剰: 単純={netStageSurplus st.V_simple st.C_simple} vs 能力不足時={netStageSurplus st.V_advanced st.C_advanced_raw} -> 獲得後={netStageSurplus st.V_advanced (st.C_advanced_raw - st.cogCapabilityGain)}"
   IO.println s!"        認知過負荷時最大利得={maxInstitutionalPayoff rp_loaded} (< 暴力=20) -> 第8段階回復後={maxInstitutionalPayoff rp_stage8} (>= 20)"
   -- Section 7
-  let a := sampleStage8Advanced
-  let pi_cap := netPayoffCapitalism a
-  let pi_algo := netPayoffAlgorithmic a
-  IO.println s!"[Sec 7] Stage8 vs Stage 6(資本主義的評価):"
-  IO.println s!"        資本主義純余剰={pi_cap} vs 8純余剰={pi_algo} (超過利得={pi_algo - pi_cap})"
-  IO.println s!"        実現可能性判定: isStageFeasible(.stage8) = True, 超越条件成立"
+  IO.println "[Sec 7] 保存能力・情報劣化率による動的ガバナンス相転移シミュレーション:"
+  let p_prim := sampleEnvPrimitive
+  IO.println s!"        ① 原始・高劣化相 (deg={p_prim.degRate}, L={p_prim.L}): W(暴力)={welfareViolence p_prim} > W(法治)={welfareRuleOfLaw p_prim}, W(市場)={welfareMarket p_prim} [暴力単独成立]"
+  let p_law := sampleEnvRuleOfLaw
+  IO.println s!"        ② 成文法治相 (deg={p_law.degRate}, L={p_law.L}): W(法治)={welfareRuleOfLaw p_law} > W(暴力)={welfareViolence p_law} [法治解禁・最適]"
+  let p_mkt := sampleEnvMarket
+  IO.println s!"        ③ 市場・資本主義相 (deg={p_mkt.degRate}, L={p_mkt.L}): W(市場)={welfareMarket p_mkt} > W(法治)={welfareRuleOfLaw p_mkt} [市場解禁・最適]"
+  let p_algo := sampleEnvAlgorithmic
+  IO.println s!"        ④ アルゴリズム統治相 (deg={p_algo.degRate}, L={p_algo.L}, ν={p_algo.verifiability}): W(アルゴリズム)={welfareAlgorithmic p_algo} > W(市場)={welfareMarket p_algo} [全ガバナンス圧倒・超克]"
   IO.println "======================================================================"
   IO.println " 全セクション (Sec 0〜7) の定理群が Lean 4 型検査により検証されました。"
