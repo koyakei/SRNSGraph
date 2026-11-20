@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>社会相転移マルチエージェント・シミュレーション — SRNS Phase Transition</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;color:#e0e0e0;font-family:'Courier New',monospace;overflow-x:hidden}
+#container{display:flex;flex-wrap:wrap;width:100vw;min-height:100vh}
+#left-panel{flex:0 0 320px;padding:10px;background:#0d0d24;border-right:1px solid #333;overflow-y:auto;max-height:100vh}
+#center{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px}
+#right-panel{flex:0 0 380px;padding:10px;background:#0d0d24;border-left:1px solid #333;overflow-y:auto;max-height:100vh}
+canvas{border:1px solid #444;background:#050510;image-rendering:pixelated}
+h1{font-size:14px;color:#88ccff;margin-bottom:8px;text-align:center}
+h2{font-size:12px;color:#66aadd;margin:10px 0 5px;border-bottom:1px solid #333;padding-bottom:3px}
+h3{font-size:11px;color:#88bbcc;margin:6px 0 3px}
+.ctrl{margin:3px 0;display:flex;align-items:center;gap:6px;font-size:10px}
+.ctrl label{flex:0 0 130px;text-align:right}
+.ctrl input[type=range]{flex:1;accent-color:#4488cc}
+.ctrl .val{flex:0 0 50px;color:#aaddff;font-size:10px}
+button{background:#224466;color:#cce;border:1px solid #446;padding:4px 10px;cursor:pointer;font-size:11px;border-radius:3px;margin:2px}
+button:hover{background:#335577}
+button.active{background:#446688;border-color:#88c}
+.stat-box{background:#111128;border:1px solid #333;padding:6px;margin:4px 0;border-radius:4px;font-size:10px;line-height:1.5}
+.phase-ind{display:flex;gap:4px;margin:6px 0}
+.phase-dot{flex:1;text-align:center;padding:3px;border-radius:3px;font-size:9px;font-weight:bold}
+.p1{background:#661111}.p2{background:#116611}.p3{background:#115566}.p4{background:#664411}
+.p1.active{background:#cc3333}.p2.active{background:#33cc33}.p3.active{background:#33aacc}.p4.active{background:#ccaa33}
+#charts-area{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:6px}
+.mini-chart{width:180px;height:90px;background:#0a0a18;border:1px solid #333;border-radius:3px}
+#sweep-results{font-size:9px;max-height:200px;overflow-y:auto;background:#0a0a18;padding:4px;border:1px solid #333;border-radius:3px;white-space:pre-wrap}
+.legend{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0}
+.legend-item{display:flex;align-items:center;gap:3px;font-size:9px}
+.legend-swatch{width:10px;height:10px;border-radius:2px;border:1px solid #555}
+</style>
+</head>
+<body>
+<div id="container">
+<!-- LEFT PANEL: Controls -->
+<div id="left-panel">
+<h1>⚡ 社会相転移シミュレーション</h1>
+<h2>🎮 シミュレーション制御</h2>
+<div style="display:flex;gap:4px;flex-wrap:wrap">
+<button id="btn-start">▶ 開始</button>
+<button id="btn-pause">⏸ 一時停止</button>
+<button id="btn-reset">🔄 リセット</button>
+<button id="btn-step">⏭ 1ステップ</button>
+</div>
+<div class="ctrl"><label>速度:</label><input type="range" id="speed" min="1" max="60" value="10"><span class="val" id="speed-val">10</span></div>
+
+<h2>📊 パラメータ調整</h2>
+<h3>暴力パラメータ</h3>
+<div class="ctrl"><label>F_max (暴力上限):</label><input type="range" id="p-fmax" min="30" max="200" value="100" step="5"><span class="val" id="v-fmax">1.00</span></div>
+<div class="ctrl"><label>C_fight (暴力コスト):</label><input type="range" id="p-cfight" min="1" max="50" value="10" step="1"><span class="val" id="v-cfight">0.10</span></div>
+<div class="ctrl"><label>β (暴力抑止効率):</label><input type="range" id="p-beta" min="10" max="500" value="200" step="10"><span class="val" id="v-beta">2.00</span></div>
+
+<h3>取引パラメータ</h3>
+<div class="ctrl"><label>ρ₀ (踏み倒しリスク):</label><input type="range" id="p-rho0" min="30" max="95" value="80" step="1"><span class="val" id="v-rho0">0.80</span></div>
+<div class="ctrl"><label>E_max (評価取引上限):</label><input type="range" id="p-emax" min="200" max="1000" value="500" step="10"><span class="val" id="v-emax">5.00</span></div>
+
+<h3>情報パラメータ</h3>
+<div class="ctrl"><label>λ_deg₀ (初期劣化率):</label><input type="range" id="p-degrate" min="50" max="99" value="90" step="1"><span class="val" id="v-degrate">0.90</span></div>
+<div class="ctrl"><label>L成長率:</label><input type="range" id="p-lgrowth" min="1" max="200" value="50" step="1"><span class="val" id="v-lgrowth">0.050</span></div>
+
+<h3>進化パラメータ</h3>
+<div class="ctrl"><label>突然変異率(E):</label><input type="range" id="p-mutE" min="1" max="100" value="15" step="1"><span class="val" id="v-mutE">0.015</span></div>
+<div class="ctrl"><label>突然変異率(M):</label><input type="range" id="p-mutM" min="1" max="50" value="5" step="1"><span class="val" id="v-mutM">0.005</span></div>
+<div class="ctrl"><label>C_switch (移動コスト):</label><input type="range" id="p-cswitch" min="10" max="500" value="100" step="10"><span class="val" id="v-cswitch">1.00</span></div>
+
+<h3>グリッド設定</h3>
+<div class="ctrl"><label>グリッドサイズ:</label><input type="range" id="p-gridsize" min="30" max="120" value="64" step="2"><span class="val" id="v-gridsize">64</span></div>
+
+<h2>🔬 パラメータスイープ</h2>
+<div style="display:flex;gap:4px;flex-wrap:wrap">
+<button id="btn-sweep">🔍 自動探索開始</button>
+<button id="btn-sweep-stop">⏹ 探索停止</button>
+</div>
+<div class="ctrl"><label>スイープ試行数:</label><input type="range" id="p-sweepN" min="10" max="200" value="50" step="10"><span class="val" id="v-sweepN">50</span></div>
+<div class="ctrl"><label>各試行ステップ:</label><input type="range" id="p-sweepSteps" min="200" max="2000" value="800" step="100"><span class="val" id="v-sweepSteps">800</span></div>
+<div id="sweep-results">探索結果がここに表示されます...</div>
+</div>
+
+<!-- CENTER: Canvas -->
+<div id="center">
+<canvas id="grid-canvas" width="640" height="640"></canvas>
+<div class="legend" id="legend-bar">
+<div class="legend-item"><span class="legend-swatch" style="background:#cc3333"></span>暴力(F)</div>
+<div class="legend-item"><span class="legend-swatch" style="background:#33aa33"></span>血縁(G)</div>
+<div class="legend-item"><span class="legend-swatch" style="background:#3388cc"></span>評価取引(E)</div>
+<div class="legend-item"><span class="legend-swatch" style="background:#ccaa33"></span>市場(Market)</div>
+<div class="legend-item"><span class="legend-swatch" style="background:#cc66cc"></span>メタ制御(M)</div>
+<div class="legend-item"><span class="legend-swatch" style="background:rgba(255,255,255,0.15)"></span>ルール圏境界</div>
+</div>
+<div id="charts-area">
+<canvas class="mini-chart" id="chart-actions" width="180" height="90"></canvas>
+<canvas class="mini-chart" id="chart-payoffs" width="180" height="90"></canvas>
+<canvas class="mini-chart" id="chart-params" width="180" height="90"></canvas>
+<canvas class="mini-chart" id="chart-domains" width="180" height="90"></canvas>
+</div>
+</div>
+
+<!-- RIGHT PANEL: Stats -->
+<div id="right-panel">
+<h2>📈 リアルタイム指標</h2>
+<div class="stat-box" id="stat-step">ステップ: 0</div>
+<h3>フェーズ検出器（自然創発）</h3>
+<div class="phase-ind">
+<div class="phase-dot p1" id="pd1">P1 暴力</div>
+<div class="phase-dot p2" id="pd2">P2 評価</div>
+<div class="phase-dot p3" id="pd3">P3 市場</div>
+<div class="phase-dot p4" id="pd4">P4 統治</div>
+</div>
+<div class="stat-box" id="stat-dominant">支配的行動: -</div>
+
+<h3>行動分布</h3>
+<div class="stat-box" id="stat-actions">
+暴力行動率: 0%<br>
+血縁協調率: 0%<br>
+評価取引率: 0%<br>
+市場取引率: 0%<br>
+メタ制御率: 0%
+</div>
+
+<h3>集団統計</h3>
+<div class="stat-box" id="stat-population">
+平均F: 0.00  平均G: 0.00<br>
+平均E: 0.00  平均M: 0.00<br>
+E保有率: 0%  M保有率: 0%
+</div>
+
+<h3>環境指標</h3>
+<div class="stat-box" id="stat-env">
+アーカイブ長 L: 0.00<br>
+情報劣化率 λ_deg: 0.90<br>
+有効アーカイブ L_eff: 0.00<br>
+暴力発生率: 0%<br>
+評価取引量: 0<br>
+市場流動性: 0.00
+</div>
+
+<h3>ルール圏（フェーズ4）</h3>
+<div class="stat-box" id="stat-domains">
+ルール圏数: 0<br>
+最大圏人口: 0<br>
+圏間移動数: 0
+</div>
+
+<h3>利得分布</h3>
+<div class="stat-box" id="stat-payoffs">
+暴力利得平均: 0.00<br>
+血縁利得平均: 0.00<br>
+評価利得平均: 0.00<br>
+市場利得平均: 0.00<br>
+メタ利得平均: 0.00
+</div>
+
+<h2>📜 イベントログ</h2>
+<div class="stat-box" id="event-log" style="max-height:180px;overflow-y:auto;font-size:9px">
+システム初期化中...<br>
+</div>
+</div>
+</div>
+
+<script>
+"use strict";
+
+// ============================================================================
+// PARAMETER SYSTEM
+// ============================================================================
+const P = {
+  fMax: 1.0,       // 暴力能力の上限Cap
+  cFight: 0.10,    // 暴力維持コスト
+  beta: 2.0,       // 暴力による取引踏み倒し抑止効率
+  rho0: 0.80,      // 基底踏み倒しリスク
+  eMax: 5.0,       // 評価移転力の上限
+  degRate0: 0.90,  // 初期情報劣化率
+  lGrowth: 0.05,   // アーカイブ成長率
+  mutE: 0.015,     // E突然変異率
+  mutM: 0.005,     // M突然変異率
+  cSwitch: 1.0,    // 集団間移動コスト
+  gridSize: 64,
+  // Derived / internal
+  kappa: 0.5,      // 一人あたり略奪上限
+  cSignal: 0.05,   // シグナリングコスト
+  feeBase: 0.08,   // ルール圏基底手数料
+  deathRate: 0.01, // 世代交代率
+  moveDist: 2,     // 移動距離
+};
+
+// ============================================================================
+// SIMULATION STATE
+// ============================================================================
+let grid = [];       // 2D array of agents
+let GS = 64;         // current grid size
+let step = 0;
+let running = false;
+let sweepRunning = false;
+let animFrame = null;
+let speed = 10;
+
+// Global environment (emergent)
+let archiveL = 0;
+let degRate = 0.9;
+let marketLiquidity = 0;
+
+// History for charts
+const HIST_LEN = 300;
+const history = {
+  violence: [], kin: [], eval: [], market: [], meta: [],
+  avgF: [], avgG: [], avgE: [], avgM: [],
+  archiveL: [], degRate: [],
+  domainCount: [], maxDomainPop: []
+};
+
+// Domain (rule-zone) system
+let domains = [];      // [{id, x, y, fee, rent, transparency, violence_backing, members: Set}]
+let nextDomainId = 1;
+
+// Stats
+let stats = {
+  violenceRate: 0, kinRate: 0, evalRate: 0, marketRate: 0, metaRate: 0,
+  avgF: 0, avgG: 0, avgE: 0, avgM: 0,
+  eHolders: 0, mHolders: 0,
+  violenceEvents: 0, evalDeals: 0, domainSwitches: 0,
+  payoffs: { violence: 0, kin: 0, eval: 0, market: 0, meta: 0 }
+};
+
+// ============================================================================
+// AGENT
+// ============================================================================
+function createAgent(x, y) {
+  return {
+    x, y,
+    F: 0.3 + Math.random() * 0.5,   // violence
+    G: 0.2 + Math.random() * 0.5,   // genetic info
+    E: 0,                            // evaluation transfer (starts ~0)
+    M: 0,                            // meta control (starts 0)
+    resource: 1.0 + Math.random(),
+    action: 'violence',              // current best action
+    payoff: 0,
+    clanId: -1,
+    domainId: -1,
+    age: 0,
+    evalPartners: 0,
+    marketDeals: 0,
+  };
+}
+
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+function initGrid() {
+  GS = P.gridSize;
+  grid = [];
+  for (let y = 0; y < GS; y++) {
+    grid[y] = [];
+    for (let x = 0; x < GS; x++) {
+      grid[y][x] = createAgent(x, y);
+    }
+  }
+  step = 0;
+  archiveL = 0.01;
+  degRate = P.degRate0;
+  marketLiquidity = 0;
+  domains = [];
+  nextDomainId = 1;
+  
+  // Clear history
+  for (let k in history) history[k] = [];
+  
+  logEvent("システム初期化完了: " + GS + "×" + GS + " = " + (GS*GS) + " エージェント");
+  logEvent("初期状態: L≈0, λ_deg=" + degRate.toFixed(2) + ", E≈0, M=0");
+}
+
+// ============================================================================
+// NEIGHBOR HELPERS
+// ============================================================================
+function getNeighbors(x, y, r) {
+  const ns = [];
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const nx = (x + dx + GS) % GS;
+      const ny = (y + dy + GS) % GS;
+      ns.push(grid[ny][nx]);
+    }
+  }
+  return ns;
+}
+
+function getClanMembers(agent) {
+  // Clan = neighbors with similar G
+  const ns = getNeighbors(agent.x, agent.y, 2);
+  return ns.filter(n => Math.abs(n.G - agent.G) < 0.3 && n.G > 0.1);
+}
+
+// ============================================================================
+// PAYOFF CALCULATIONS — No hardcoded phase flags!
+// Each agent evaluates ALL strategies and picks the best.
+// ============================================================================
+
+function payoffViolence(agent) {
+  const ns = getNeighbors(agent.x, agent.y, 1);
+  const weaker = ns.filter(n => n.F < agent.F * 0.8);
+  const lootable = weaker.reduce((s, n) => s + Math.min(n.resource * 0.3, P.kappa), 0);
+  // F_i is capped at F_max
+  const effectiveF = Math.min(agent.F, P.fMax);
+  return effectiveF * lootable - P.cFight * effectiveF * effectiveF;
+}
+
+function payoffKin(agent) {
+  const clan = getClanMembers(agent);
+  if (clan.length === 0) return 0;
+  const avgG = clan.reduce((s, c) => s + c.G, 0) / clan.length;
+  return agent.G * clan.length * avgG * (1 - degRate) * 0.3;
+}
+
+function payoffEval(agent) {
+  if (agent.E < 0.01) return -Infinity;  // Can't do it without E
+  const ns = getNeighbors(agent.x, agent.y, 3);
+  const partners = ns.filter(n => n.E > 0.01);
+  if (partners.length === 0) return -0.1;
+  
+  let totalDeal = 0;
+  for (const p of partners) {
+    // Betrayal risk reduced by violence backing
+    const violenceBacking = Math.max(agent.F, ...getNeighbors(agent.x, agent.y, 1).map(n => n.F * 0.5));
+    const rho = P.rho0 * Math.exp(-P.beta * Math.min(violenceBacking, P.fMax));
+    const dealValue = Math.min(agent.E, p.E) * 0.2 * (1 - rho);
+    totalDeal += dealValue;
+  }
+  agent.evalPartners = partners.length;
+  return totalDeal;
+}
+
+function payoffMarket(agent) {
+  if (agent.E < 0.1) return -Infinity;
+  // Need sufficient archive length and low degradation
+  const lEff = archiveL * Math.pow(1 - degRate, Math.min(archiveL, 10));
+  if (lEff < 0.5) return -0.5;  // Market not viable without records
+  
+  // Count market participants in wider area
+  const ns = getNeighbors(agent.x, agent.y, 4);
+  const marketParticipants = ns.filter(n => n.E > 0.1).length;
+  const liquidity = marketParticipants / Math.max(1, ns.length);
+  
+  return agent.E * lEff * liquidity * 0.4 - P.cSignal;
+}
+
+function payoffMeta(agent) {
+  if (agent.M < 0.01) return -Infinity;  // Can't do without M
+  if (agent.E < 0.1) return -Infinity;   // Need evaluation infrastructure
+  
+  // Find or create domain
+  let myDomain = domains.find(d => d.id === agent.domainId);
+  let domainSize = myDomain ? myDomain.members.size : 1;
+  
+  const fee = P.feeBase * (1 + agent.M * 0.5);
+  const verificationCost = 0.03 / (1 + agent.M);
+  const rent = fee - verificationCost;
+  
+  if (rent <= 0) return -0.1;
+  
+  return agent.M * domainSize * rent * 0.5;
+}
+
+// ============================================================================
+// STEP: Each agent picks best action, executes, environment updates
+// ============================================================================
+function simulationStep() {
+  const N = GS * GS;
+  let actionCounts = { violence: 0, kin: 0, eval: 0, market: 0, meta: 0 };
+  let payoffSums = { violence: 0, kin: 0, eval: 0, market: 0, meta: 0 };
+  let payoffCounts = { violence: 0, kin: 0, eval: 0, market: 0, meta: 0 };
+  let totalF = 0, totalG = 0, totalE = 0, totalM = 0;
+  let eCount = 0, mCount = 0;
+  let violenceEvents = 0, evalDeals = 0, domainSwitches = 0;
+  
+  // Shuffle agent order
+  const agents = [];
+  for (let y = 0; y < GS; y++)
+    for (let x = 0; x < GS; x++)
+      agents.push(grid[y][x]);
+  
+  // Fisher-Yates shuffle
+  for (let i = agents.length - 1; i > 0; i--) {
+    const j = Math.random() * (i + 1) | 0;
+    [agents[i], agents[j]] = [agents[j], agents[i]];
+  }
+  
+  // Phase 1: Evaluate payoffs and choose action
+  for (const a of agents) {
+    const pV = payoffViolence(a);
+    const pK = payoffKin(a);
+    const pE = payoffEval(a);
+    const pMk = payoffMarket(a);
+    const pMt = payoffMeta(a);
+    
+    const payoffs = [
+      ['violence', pV], ['kin', pK], ['eval', pE], ['market', pMk], ['meta', pMt]
+    ].filter(p => isFinite(p[1]));
+    
+    // Pick best (with small noise for exploration)
+    let best = payoffs[0];
+    for (const p of payoffs) {
+      if (p[1] + (Math.random() - 0.5) * 0.02 > best[1]) best = p;
+    }
+    
+    a.action = best[0];
+    a.payoff = best[1];
+    
+    actionCounts[a.action]++;
+    if (isFinite(best[1])) {
+      payoffSums[a.action] += best[1];
+      payoffCounts[a.action]++;
+    }
+  }
+  
+  // Phase 2: Execute actions and update resources
+  for (const a of agents) {
+    a.resource = Math.max(0.1, a.resource + a.payoff * 0.1 + 0.05);
+    a.resource = Math.min(a.resource, 10);
+    a.age++;
+    
+    if (a.action === 'violence') violenceEvents++;
+    if (a.action === 'eval') evalDeals += a.evalPartners;
+    
+    totalF += a.F; totalG += a.G; totalE += a.E; totalM += a.M;
+    if (a.E > 0.01) eCount++;
+    if (a.M > 0.01) mCount++;
+  }
+  
+  // Phase 3: Movement — agents move toward better opportunities
+  for (const a of agents) {
+    if (Math.random() > 0.3) continue;  // Not everyone moves every step
+    
+    const ns = getNeighbors(a.x, a.y, P.moveDist);
+    if (ns.length === 0) continue;
+    
+    // Find best neighbor cell to move to
+    let bestN = null;
+    let bestVal = a.payoff;
+    
+    for (const n of ns) {
+      let val = 0;
+      if (a.action === 'violence') val = n.resource * 0.3;
+      else if (a.action === 'kin') val = Math.abs(n.G - a.G) < 0.3 ? a.G * 0.5 : -0.1;
+      else if (a.action === 'eval' || a.action === 'market') val = n.E > 0.1 ? n.E * 0.3 : -0.1;
+      else if (a.action === 'meta') {
+        // Move toward best domain (foot-voting)
+        if (n.domainId >= 0 && n.domainId !== a.domainId) {
+          const targetDomain = domains.find(d => d.id === n.domainId);
+          const myDomain = domains.find(d => d.id === a.domainId);
+          if (targetDomain) {
+            const targetAttr = targetDomain.members.size / (targetDomain.fee + 0.01);
+            const myAttr = myDomain ? myDomain.members.size / (myDomain.fee + 0.01) : 0;
+            val = (targetAttr - myAttr) - P.cSwitch;
+          }
+        }
+      }
+      
+      if (val > bestVal) { bestVal = val; bestN = n; }
+    }
+    
+    if (bestN && bestN !== a) {
+      // Swap positions
+      const ox = a.x, oy = a.y;
+      const nx = bestN.x, ny = bestN.y;
+      grid[oy][ox] = bestN;
+      grid[ny][nx] = a;
+      bestN.x = ox; bestN.y = oy;
+      a.x = nx; a.y = ny;
+      
+      // Domain switching
+      if (a.action === 'meta' && bestN.domainId >= 0 && bestN.domainId !== a.domainId) {
+        const oldDomain = domains.find(d => d.id === a.domainId);
+        const newDomain = domains.find(d => d.id === bestN.domainId);
+        if (oldDomain) oldDomain.members.delete(a);
+        if (newDomain) newDomain.members.add(a);
+        a.domainId = bestN.domainId;
+        domainSwitches++;
+      }
+    }
+  }
+  
+  // Phase 4: Domain management (rule-zones emerge from high-M agents)
+  for (const a of agents) {
+    if (a.M > 0.1 && a.domainId < 0) {
+      // Create new domain
+      const d = {
+        id: nextDomainId++,
+        x: a.x, y: a.y,
+        fee: P.feeBase * (1 + a.M * 0.3),
+        rent: 0,
+        transparency: a.M * 0.5,
+        violenceBacking: a.F,
+        members: new Set([a])
+      };
+      domains.push(d);
+      a.domainId = d.id;
+      if (domains.length <= 3) {
+        logEvent("ステップ " + step + ": ルール圏 #" + d.id + " が創発 (M=" + a.M.toFixed(2) + ")");
+      }
+    }
+  }
+  
+  // Absorb nearby agents into domains
+  for (const d of domains) {
+    const nearby = getNeighbors(d.x, d.y, 3);
+    for (const n of nearby) {
+      if (n.domainId < 0 && n.E > 0.05) {
+        // Agent considers joining
+        const attractiveness = d.members.size / (d.fee + 0.1);
+        if (attractiveness > 1.5 && Math.random() < 0.1) {
+          d.members.add(n);
+          n.domainId = d.id;
+        }
+      }
+    }
+    // Update domain position (center of mass)
+    if (d.members.size > 0) {
+      let sx = 0, sy = 0;
+      for (const m of d.members) { sx += m.x; sy += m.y; }
+      d.x = (sx / d.members.size) | 0;
+      d.y = (sy / d.members.size) | 0;
+    }
+  }
+  
+  // Remove dead domains
+  domains = domains.filter(d => d.members.size > 0);
+  
+  // Phase 5: Evolution / Reproduction / Mutation
+  for (const a of agents) {
+    if (Math.random() < P.deathRate) {
+      // Find best neighbor as parent
+      const ns = getNeighbors(a.x, a.y, 1);
+      const parent = ns.reduce((best, n) => n.resource > best.resource ? n : best, a);
+      
+      // Inherit with mutation
+      a.F = Math.max(0.05, Math.min(P.fMax, parent.F + (Math.random() - 0.5) * 0.1));
+      a.G = Math.max(0.05, parent.G + (Math.random() - 0.5) * 0.1);
+      
+      // E mutation: only appears through rare mutation (initially ~0)
+      if (parent.E > 0.01) {
+        a.E = Math.max(0, Math.min(P.eMax, parent.E + (Math.random() - 0.5) * 0.1));
+      } else if (Math.random() < P.mutE) {
+        a.E = Math.random() * 0.2;
+        // Rare event logging
+        if (eCount < 5) logEvent("ステップ " + step + ": E突然変異! 評価移転力の発現 (E=" + a.E.toFixed(3) + ")");
+      }
+      
+      // M mutation: only appears in agents that already have E
+      if (parent.M > 0.01 && parent.E > 0.1) {
+        a.M = Math.max(0, parent.M + (Math.random() - 0.5) * 0.05);
+      } else if (a.E > 0.1 && Math.random() < P.mutM) {
+        a.M = Math.random() * 0.1;
+        if (mCount < 3) logEvent("ステップ " + step + ": M突然変異! メタ制御力の発現 (M=" + a.M.toFixed(3) + ")");
+      }
+      
+      a.resource = 1.0;
+      a.age = 0;
+      a.domainId = -1;
+    }
+  }
+  
+  // Phase 6: Environment update (emergent, not hardcoded)
+  // Archive length grows based on E and M activity
+  const evalActivity = actionCounts.eval / N;
+  const metaActivity = actionCounts.meta / N;
+  archiveL += P.lGrowth * (evalActivity + metaActivity * 2) * (1 + totalM / N);
+  archiveL = Math.min(archiveL, 1000);
+  
+  // Degradation rate decreases as archive grows and M increases
+  const mDensity = totalM / N;
+  degRate = P.degRate0 * Math.exp(-0.03 * archiveL) / (1 + mDensity * 5);
+  degRate = Math.max(0.01, Math.min(0.99, degRate));
+  
+  // Market liquidity based on E holders and archive
+  const lEff = archiveL * Math.pow(1 - degRate, Math.min(archiveL, 10));
+  marketLiquidity = (eCount / N) * lEff * 0.1;
+  
+  // Update stats
+  stats.violenceRate = actionCounts.violence / N;
+  stats.kinRate = actionCounts.kin / N;
+  stats.evalRate = actionCounts.eval / N;
+  stats.marketRate = actionCounts.market / N;
+  stats.metaRate = actionCounts.meta / N;
+  stats.avgF = totalF / N;
+  stats.avgG = totalG / N;
+  stats.avgE = totalE / N;
+  stats.avgM = totalM / N;
+  stats.eHolders = eCount / N;
+  stats.mHolders = mCount / N;
+  stats.violenceEvents = violenceEvents;
+  stats.evalDeals = evalDeals;
+  stats.domainSwitches = domainSwitches;
+  
+  for (const k in payoffSums) {
+    stats.payoffs[k] = payoffCounts[k] > 0 ? payoffSums[k] / payoffCounts[k] : 0;
+  }
+  
+  // Push history
+  const push = (arr, v) => { arr.push(v); if (arr.length > HIST_LEN) arr.shift(); };
+  push(history.violence, stats.violenceRate);
+  push(history.kin, stats.kinRate);
+  push(history.eval, stats.evalRate);
+  push(history.market, stats.marketRate);
+  push(history.meta, stats.metaRate);
+  push(history.avgF, stats.avgF);
+  push(history.avgG, stats.avgG);
+  push(history.avgE, stats.avgE);
+  push(history.avgM, stats.avgM);
+  push(history.archiveL, archiveL);
+  push(history.degRate, degRate);
+  push(history.domainCount, domains.length);
+  push(history.maxDomainPop, domains.reduce((m, d) => Math.max(m, d.members.size), 0));
+  
+  // Detect phase transitions (emergent, based on action distribution)
+  detectPhaseTransitions();
+  
+  step++;
+}
+
+// ============================================================================
+// PHASE DETECTION (observational, not prescriptive)
+// ============================================================================
+let currentPhases = [false, false, false, false];
+let phaseFirstDetected = [0, 0, 0, 0];
+
+function detectPhaseTransitions() {
+  const wasPhase = [...currentPhases];
+  
+  // Phase 1: Violence + Kin dominate (>60% combined)
+  currentPhases[0] = (stats.violenceRate + stats.kinRate) > 0.4;
+  
+  // Phase 2: Eval transactions significant (>10%)
+  currentPhases[1] = stats.evalRate > 0.08 && stats.eHolders > 0.05;
+  
+  // Phase 3: Market transactions significant AND archive is effective
+  const lEff = archiveL * Math.pow(1 - degRate, Math.min(archiveL, 10));
+  currentPhases[2] = stats.marketRate > 0.05 && lEff > 1.0;
+  
+  // Phase 4: Multiple domains competing, with switching
+  currentPhases[3] = domains.length >= 2 && stats.metaRate > 0.02;
+  
+  // Log transitions
+  for (let i = 0; i < 4; i++) {
+    if (currentPhases[i] && !wasPhase[i]) {
+      phaseFirstDetected[i] = step;
+      const names = ["暴力と血縁の局所秩序", "評価移転権利の交換", "評価の市場取引", "メタ・ガバナンス競争"];
+      logEvent("🔄 ステップ " + step + ": フェーズ" + (i+1) + " 創発検出 — " + names[i]);
+    }
+  }
+}
+
+function getDominantPhase() {
+  const rates = [stats.violenceRate + stats.kinRate, stats.evalRate, stats.marketRate, stats.metaRate];
+  let maxI = 0;
+  for (let i = 1; i < rates.length; i++) if (rates[i] > rates[maxI]) maxI = i;
+  return maxI;
+}
+
+// ============================================================================
+// RENDERING
+// ============================================================================
+const canvas = document.getElementById('grid-canvas');
+const ctx = canvas.getContext('2d');
+
+function render() {
+  const cellW = canvas.width / GS;
+  const cellH = canvas.height / GS;
+  
+  ctx.fillStyle = '#050510';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Draw domain territories (background)
+  for (const d of domains) {
+    const hue = (d.id * 67) % 360;
+    ctx.fillStyle = `hsla(${hue}, 40%, 15%, 0.3)`;
+    for (const m of d.members) {
+      ctx.fillRect(m.x * cellW, m.y * cellH, cellW + 0.5, cellH + 0.5);
+    }
+    // Domain center marker
+    ctx.strokeStyle = `hsla(${hue}, 60%, 50%, 0.6)`;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(
+      (d.x - 2) * cellW, (d.y - 2) * cellH,
+      5 * cellW, 5 * cellH
+    );
+  }
+  
+  // Draw agents
+  for (let y = 0; y < GS; y++) {
+    for (let x = 0; x < GS; x++) {
+      const a = grid[y][x];
+      let r, g, b;
+      
+      switch (a.action) {
+        case 'violence':
+          r = 180 + a.F * 75; g = 30 + a.F * 20; b = 30;
+          break;
+        case 'kin':
+          r = 30; g = 120 + a.G * 135; b = 30 + a.G * 50;
+          break;
+        case 'eval':
+          r = 30; g = 80 + a.E * 30; b = 150 + a.E * 20;
+          break;
+        case 'market':
+          r = 180 + a.E * 15; g = 150 + a.E * 20; b = 40;
+          break;
+        case 'meta':
+          r = 180 + a.M * 75; g = 60; b = 180 + a.M * 75;
+          break;
+        default:
+          r = g = b = 60;
+      }
+      
+      // Brightness by resource
+      const bright = 0.4 + 0.6 * Math.min(a.resource / 5, 1);
+      ctx.fillStyle = `rgb(${(r*bright)|0},${(g*bright)|0},${(b*bright)|0})`;
+      ctx.fillRect(x * cellW, y * cellH, cellW + 0.5, cellH + 0.5);
+    }
+  }
+  
+  // Draw mini-charts
+  drawMiniChart('chart-actions', '行動分布', [
+    { data: history.violence, color: '#cc3333', label: '暴力' },
+    { data: history.kin, color: '#33aa33', label: '血縁' },
+    { data: history.eval, color: '#3388cc', label: '評価' },
+    { data: history.market, color: '#ccaa33', label: '市場' },
+    { data: history.meta, color: '#cc66cc', label: 'メタ' },
+  ], 1.0);
+  
+  drawMiniChart('chart-payoffs', '平均利得', [
+    { data: history.avgF, color: '#cc3333', label: 'F' },
+    { data: history.avgG, color: '#33aa33', label: 'G' },
+    { data: history.avgE, color: '#3388cc', label: 'E' },
+    { data: history.avgM, color: '#cc66cc', label: 'M' },
+  ]);
+  
+  drawMiniChart('chart-params', '環境指標', [
+    { data: history.archiveL.map(v => v / 100), color: '#66ccff', label: 'L/100' },
+    { data: history.degRate, color: '#ff6666', label: 'λ_deg' },
+  ], 1.0);
+  
+  drawMiniChart('chart-domains', 'ルール圏', [
+    { data: history.domainCount.map(v => v / 20), color: '#ffaa33', label: '圏数/20' },
+    { data: history.maxDomainPop.map(v => v / (GS*GS/4)), color: '#33ccaa', label: '最大圏' },
+  ], 1.0);
+  
+  // Update UI
+  updateStatsDisplay();
+}
+
+function drawMiniChart(canvasId, title, series, maxY) {
+  const c = document.getElementById(canvasId);
+  const cx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  
+  cx.fillStyle = '#0a0a18';
+  cx.fillRect(0, 0, W, H);
+  
+  // Title
+  cx.fillStyle = '#888';
+  cx.font = '9px monospace';
+  cx.fillText(title, 4, 10);
+  
+  if (series[0].data.length < 2) return;
+  
+  // Auto-scale if no maxY
+  if (!maxY) {
+    maxY = 0;
+    for (const s of series)
+      for (const v of s.data)
+        if (isFinite(v) && v > maxY) maxY = v;
+    maxY = Math.max(maxY, 0.1);
+  }
+  
+  const marginTop = 14, marginBot = 2;
+  const plotH = H - marginTop - marginBot;
+  
+  for (const s of series) {
+    if (s.data.length < 2) continue;
+    cx.strokeStyle = s.color;
+    cx.lineWidth = 1;
+    cx.beginPath();
+    for (let i = 0; i < s.data.length; i++) {
+      const x = (i / (HIST_LEN - 1)) * W;
+      const v = isFinite(s.data[i]) ? s.data[i] : 0;
+      const y = marginTop + plotH * (1 - Math.min(v / maxY, 1));
+      if (i === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+    }
+    cx.stroke();
+  }
+}
+
+function updateStatsDisplay() {
+  document.getElementById('stat-step').textContent = `ステップ: ${step} | エージェント: ${GS*GS}`;
+  
+  // Phase indicators
+  const phaseNames = ['pd1', 'pd2', 'pd3', 'pd4'];
+  for (let i = 0; i < 4; i++) {
+    const el = document.getElementById(phaseNames[i]);
+    el.classList.toggle('active', currentPhases[i]);
+    if (currentPhases[i] && phaseFirstDetected[i] > 0) {
+      el.title = `t=${phaseFirstDetected[i]}で検出`;
+    }
+  }
+  
+  const domPhase = getDominantPhase();
+  const domNames = ['暴力+血縁', '評価取引', '市場取引', 'メタ統治'];
+  document.getElementById('stat-dominant').textContent = `支配的フェーズ: ${domNames[domPhase]}`;
+  
+  document.getElementById('stat-actions').innerHTML =
+    `暴力行動率: ${(stats.violenceRate*100).toFixed(1)}%<br>` +
+    `血縁協調率: ${(stats.kinRate*100).toFixed(1)}%<br>` +
+    `評価取引率: ${(stats.evalRate*100).toFixed(1)}%<br>` +
+    `市場取引率: ${(stats.marketRate*100).toFixed(1)}%<br>` +
+    `メタ制御率: ${(stats.metaRate*100).toFixed(1)}%`;
+  
+  document.getElementById('stat-population').innerHTML =
+    `平均F: ${stats.avgF.toFixed(3)}  平均G: ${stats.avgG.toFixed(3)}<br>` +
+    `平均E: ${stats.avgE.toFixed(3)}  平均M: ${stats.avgM.toFixed(3)}<br>` +
+    `E保有率: ${(stats.eHolders*100).toFixed(1)}%  M保有率: ${(stats.mHolders*100).toFixed(1)}%`;
+  
+  const lEff = archiveL * Math.pow(1 - degRate, Math.min(archiveL, 10));
+  document.getElementById('stat-env').innerHTML =
+    `アーカイブ長 L: ${archiveL.toFixed(2)}<br>` +
+    `情報劣化率 λ_deg: ${degRate.toFixed(4)}<br>` +
+    `有効アーカイブ L_eff: ${lEff.toFixed(2)}<br>` +
+    `暴力発生数: ${stats.violenceEvents}<br>` +
+    `評価取引量: ${stats.evalDeals}<br>` +
+    `市場流動性: ${marketLiquidity.toFixed(3)}`;
+  
+  document.getElementById('stat-domains').innerHTML =
+    `ルール圏数: ${domains.length}<br>` +
+    `最大圏人口: ${domains.reduce((m,d)=>Math.max(m,d.members.size),0)}<br>` +
+    `圏間移動数: ${stats.domainSwitches}`;
+  
+  document.getElementById('stat-payoffs').innerHTML =
+    `暴力利得平均: ${stats.payoffs.violence.toFixed(3)}<br>` +
+    `血縁利得平均: ${stats.payoffs.kin.toFixed(3)}<br>` +
+    `評価利得平均: ${stats.payoffs.eval.toFixed(3)}<br>` +
+    `市場利得平均: ${stats.payoffs.market.toFixed(3)}<br>` +
+    `メタ利得平均: ${stats.payoffs.meta.toFixed(3)}`;
+}
+
+// ============================================================================
+// EVENT LOG
+// ============================================================================
+const logEl = document.getElementById('event-log');
+function logEvent(msg) {
+  const line = document.createElement('div');
+  line.textContent = msg;
+  logEl.appendChild(line);
+  if (logEl.children.length > 100) logEl.removeChild(logEl.firstChild);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// ============================================================================
+// PARAMETER SWEEP (auto-search for golden parameters)
+// ============================================================================
+function runSweep() {
+  const sweepN = parseInt(document.getElementById('p-sweepN').value);
+  const sweepSteps = parseInt(document.getElementById('p-sweepSteps').value);
+  const results = [];
+  const sweepEl = document.getElementById('sweep-results');
+  sweepEl.textContent = `🔍 パラメータスイープ開始: ${sweepN}試行 × ${sweepSteps}ステップ\n`;
+  sweepRunning = true;
+  
+  // Save current params
+  const savedP = JSON.parse(JSON.stringify(P));
+  let trialsDone = 0;
+  
+  function runOneTrial() {
+    if (!sweepRunning || trialsDone >= sweepN) {
+      finishSweep();
+      return;
+    }
+    
+    // Random parameter sample
+    const trial = {
+      fMax: 0.3 + Math.random() * 1.7,
+      cFight: 0.01 + Math.random() * 0.4,
+      beta: 0.5 + Math.random() * 4.5,
+      rho0: 0.3 + Math.random() * 0.65,
+      degRate0: 0.5 + Math.random() * 0.49,
+      lGrowth: 0.01 + Math.random() * 0.19,
+      mutE: 0.001 + Math.random() * 0.049,
+      mutM: 0.001 + Math.random() * 0.024,
+      cSwitch: 0.1 + Math.random() * 4.9,
+    };
+    
+    // Apply trial params
+    P.fMax = trial.fMax;
+    P.cFight = trial.cFight;
+    P.beta = trial.beta;
+    P.rho0 = trial.rho0;
+    P.degRate0 = trial.degRate0;
+    P.lGrowth = trial.lGrowth;
+    P.mutE = trial.mutE;
+    P.mutM = trial.mutM;
+    P.cSwitch = trial.cSwitch;
+    P.gridSize = 32; // Smaller grid for speed
+    
+    initGrid();
+    
+    // Track phase appearance order
+    const phaseAppeared = [false, false, false, false];
+    const phaseOrder = [];
+    
+    for (let s = 0; s < sweepSteps; s++) {
+      simulationStep();
+      for (let p = 0; p < 4; p++) {
+        if (currentPhases[p] && !phaseAppeared[p]) {
+          phaseAppeared[p] = true;
+          phaseOrder.push({ phase: p + 1, step: step });
+        }
+      }
+    }
+    
+    // Score: best if all 4 phases appear in order 1→2→3→4
+    let score = 0;
+    const phasesFound = phaseOrder.length;
+    score += phasesFound * 25;
+    
+    // Bonus for correct order
+    let inOrder = true;
+    for (let i = 1; i < phaseOrder.length; i++) {
+      if (phaseOrder[i].phase <= phaseOrder[i-1].phase) inOrder = false;
+    }
+    if (inOrder && phasesFound === 4) score += 50;
+    else if (inOrder && phasesFound >= 3) score += 20;
+    
+    // Bonus for spacing (each phase should last a while)
+    if (phaseOrder.length >= 2) {
+      const gaps = [];
+      for (let i = 1; i < phaseOrder.length; i++)
+        gaps.push(phaseOrder[i].step - phaseOrder[i-1].step);
+      const minGap = Math.min(...gaps);
+      score += Math.min(20, minGap / 10);
+    }
+    
+    results.push({
+      params: { ...trial },
+      phasesFound,
+      phaseOrder: phaseOrder.map(p => `P${p.phase}@${p.step}`).join('→'),
+      inOrder,
+      score
+    });
+    
+    trialsDone++;
+    sweepEl.textContent += `試行 ${trialsDone}/${sweepN}: スコア=${score.toFixed(1)} フェーズ=[${phaseOrder.map(p=>'P'+p.phase).join(',')}] ${inOrder ? '✓順序正' : '✗'}\n`;
+    sweepEl.scrollTop = sweepEl.scrollHeight;
+    
+    // Schedule next trial
+    setTimeout(runOneTrial, 1);
+  }
+  
+  function finishSweep() {
+    sweepRunning = false;
+    
+    // Sort by score
+    results.sort((a, b) => b.score - a.score);
+    
+    sweepEl.textContent += '\n════════════════════════════════════════\n';
+    sweepEl.textContent += '🏆 黄金比パラメータ TOP 5:\n';
+    sweepEl.textContent += '════════════════════════════════════════\n';
+    
+    for (let i = 0; i < Math.min(5, results.length); i++) {
+      const r = results[i];
+      sweepEl.textContent += `\n#${i+1} スコア=${r.score.toFixed(1)} ${r.phaseOrder}\n`;
+      sweepEl.textContent += `  F_max=${r.params.fMax.toFixed(3)} C_fight=${r.params.cFight.toFixed(3)}\n`;
+      sweepEl.textContent += `  β=${r.params.beta.toFixed(3)} ρ₀=${r.params.rho0.toFixed(3)}\n`;
+      sweepEl.textContent += `  λ_deg₀=${r.params.degRate0.toFixed(3)} L_growth=${r.params.lGrowth.toFixed(3)}\n`;
+      sweepEl.textContent += `  mut_E=${r.params.mutE.toFixed(4)} mut_M=${r.params.mutM.toFixed(4)}\n`;
+      sweepEl.textContent += `  C_switch=${r.params.cSwitch.toFixed(3)}\n`;
+    }
+    
+    // Apply best params
+    if (results.length > 0 && results[0].score > 50) {
+      const best = results[0].params;
+      sweepEl.textContent += '\n✅ 最良パラメータをスライダーに反映しました\n';
+      
+      // Restore best to P and sliders
+      setSliderValue('p-fmax', best.fMax * 100);
+      setSliderValue('p-cfight', best.cFight * 100);
+      setSliderValue('p-beta', best.beta * 100);
+      setSliderValue('p-rho0', best.rho0 * 100);
+      setSliderValue('p-degrate', best.degRate0 * 100);
+      setSliderValue('p-lgrowth', best.lGrowth * 1000);
+      setSliderValue('p-mutE', best.mutE * 1000);
+      setSliderValue('p-mutM', best.mutM * 1000);
+      setSliderValue('p-cswitch', best.cSwitch * 100);
+      syncParams();
+    }
+    
+    // Restore grid size
+    P.gridSize = savedP.gridSize;
+    setSliderValue('p-gridsize', P.gridSize);
+    initGrid();
+    
+    sweepEl.scrollTop = sweepEl.scrollHeight;
+  }
+  
+  runOneTrial();
+}
+
+function setSliderValue(id, val) {
+  const el = document.getElementById(id);
+  el.value = Math.round(Math.max(parseFloat(el.min), Math.min(parseFloat(el.max), val)));
+}
+
+// ============================================================================
+// MAIN LOOP
+// ============================================================================
+function mainLoop() {
+  if (!running) return;
+  for (let i = 0; i < speed; i++) {
+    simulationStep();
+  }
+  render();
+  animFrame = requestAnimationFrame(mainLoop);
+}
+
+// ============================================================================
+// UI WIRING
+// ============================================================================
+function syncParams() {
+  P.fMax = parseInt(document.getElementById('p-fmax').value) / 100;
+  P.cFight = parseInt(document.getElementById('p-cfight').value) / 100;
+  P.beta = parseInt(document.getElementById('p-beta').value) / 100;
+  P.rho0 = parseInt(document.getElementById('p-rho0').value) / 100;
+  P.eMax = parseInt(document.getElementById('p-emax').value) / 100;
+  P.degRate0 = parseInt(document.getElementById('p-degrate').value) / 100;
+  P.lGrowth = parseInt(document.getElementById('p-lgrowth').value) / 1000;
+  P.mutE = parseInt(document.getElementById('p-mutE').value) / 1000;
+  P.mutM = parseInt(document.getElementById('p-mutM').value) / 1000;
+  P.cSwitch = parseInt(document.getElementById('p-cswitch').value) / 100;
+  P.gridSize = parseInt(document.getElementById('p-gridsize').value);
+  
+  // Update display values
+  document.getElementById('v-fmax').textContent = P.fMax.toFixed(2);
+  document.getElementById('v-cfight').textContent = P.cFight.toFixed(2);
+  document.getElementById('v-beta').textContent = P.beta.toFixed(2);
+  document.getElementById('v-rho0').textContent = P.rho0.toFixed(2);
+  document.getElementById('v-emax').textContent = P.eMax.toFixed(2);
+  document.getElementById('v-degrate').textContent = P.degRate0.toFixed(2);
+  document.getElementById('v-lgrowth').textContent = P.lGrowth.toFixed(3);
+  document.getElementById('v-mutE').textContent = P.mutE.toFixed(3);
+  document.getElementById('v-mutM').textContent = P.mutM.toFixed(3);
+  document.getElementById('v-cswitch').textContent = P.cSwitch.toFixed(2);
+  document.getElementById('v-gridsize').textContent = P.gridSize;
+}
+
+// Add event listeners to all sliders
+document.querySelectorAll('input[type=range]').forEach(el => {
+  el.addEventListener('input', syncParams);
+});
+
+document.getElementById('speed').addEventListener('input', e => {
+  speed = parseInt(e.target.value);
+  document.getElementById('speed-val').textContent = speed;
+});
+
+document.getElementById('btn-start').addEventListener('click', () => {
+  if (!running) { running = true; mainLoop(); }
+});
+
+document.getElementById('btn-pause').addEventListener('click', () => {
+  running = false;
+  if (animFrame) cancelAnimationFrame(animFrame);
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  running = false;
+  if (animFrame) cancelAnimationFrame(animFrame);
+  syncParams();
+  initGrid();
+  render();
+});
+
+document.getElementById('btn-step').addEventListener('click', () => {
+  simulationStep();
+  render();
+});
+
+document.getElementById('btn-sweep').addEventListener('click', () => {
+  running = false;
+  if (animFrame) cancelAnimationFrame(animFrame);
+  runSweep();
+});
+
+document.getElementById('btn-sweep-stop').addEventListener('click', () => {
+  sweepRunning = false;
+});
+
+document.getElementById('p-sweepN').addEventListener('input', e => {
+  document.getElementById('v-sweepN').textContent = e.target.value;
+});
+document.getElementById('p-sweepSteps').addEventListener('input', e => {
+  document.getElementById('v-sweepSteps').textContent = e.target.value;
+});
+
+// ============================================================================
+// INIT
+// ============================================================================
+syncParams();
+initGrid();
+render();
+
+logEvent("準備完了。「開始」ボタンを押すか、パラメータを調整してください。");
+logEvent("初期状態: すべてのエージェントは E≈0, M=0 です。");
+logEvent("フェーズ遷移はハードコードされず、利得最大化から自然発生します。");
+</script>
+</body>
+</html>

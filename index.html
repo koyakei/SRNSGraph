@@ -1,0 +1,1540 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Social Dynamics Life Game — Lean 4 動的ガバナンス＆統治相シミュレータ</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap');
+  :root {
+    --citizen: #34d399;
+    --bully: #f59e0b;
+    --terrorist: #f43f5e;
+    --ai-support: #818cf8;
+    --breakthrough: #38bdf8;
+    --violence: #e11d48;
+    --market: #fbbf24;
+    --ruleoflaw: #10b981;
+    --algorithmic: #06b6d4;
+    --bg-primary: #090d16;
+    --bg-secondary: #111827;
+    --border-dim: rgba(255, 255, 255, 0.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: radial-gradient(circle at 50% 0%, #151d36 0%, #070a12 100%);
+    color: #f3f4f6;
+    overflow-x: hidden;
+  }
+  .font-mono-code { font-family: 'JetBrains Mono', monospace; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+  ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+
+  .glass-panel {
+    background: rgba(17, 24, 39, 0.72);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-dim);
+  }
+  .glass-panel-sub {
+    background: rgba(31, 41, 55, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .slider-custom {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 5px;
+    background: #374151;
+    border-radius: 9999px;
+    outline: none;
+    transition: background 0.2s;
+  }
+  .slider-custom::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #38bdf8;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+  }
+
+  .btn-action {
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .btn-action:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.15);
+  }
+  .btn-action:active {
+    transform: translateY(1px);
+  }
+
+  .badge-thm {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* Tooltip HUD */
+  #cellTooltip {
+    pointer-events: none;
+    transition: opacity 0.1s ease, transform 0.1s ease;
+  }
+
+  .modal-backdrop {
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(8px);
+  }
+
+  /* Tab animation */
+  .view-tab.active {
+    background: rgba(56, 189, 248, 0.15);
+    border-color: rgba(56, 189, 248, 0.5);
+    color: #38bdf8;
+  }
+</style>
+</head>
+<body class="min-h-screen text-slate-200 text-xs">
+
+<!-- Top Navigation -->
+<header class="glass-panel sticky top-0 z-40 px-5 py-2.5 flex items-center justify-between border-b border-slate-800">
+  <div class="flex items-center gap-3">
+    <div class="relative flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-600 via-indigo-600 to-rose-500 shadow-lg shadow-indigo-500/30">
+      <span class="text-white font-bold font-mono text-sm">🏛️</span>
+      <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-slate-900 animate-pulse"></div>
+    </div>
+    <div>
+      <div class="flex items-center gap-2">
+        <h1 class="text-sm font-bold tracking-tight text-white">Social Dynamics Life Game</h1>
+        <span class="px-1.5 py-0.5 rounded text-[10px] bg-indigo-500/20 text-indigo-300 font-mono border border-indigo-500/30">Lean 4 Sec 7: Regime Transitions</span>
+      </div>
+      <p class="text-[11px] text-slate-400">暴力優位 vs 法治優位 vs 市場経済優位 vs アルゴリズム統治相転移シミュレータ</p>
+    </div>
+  </div>
+
+  <div class="flex items-center gap-3">
+    <!-- View Mode Switcher -->
+    <div class="flex bg-slate-900/90 p-0.5 rounded-lg border border-slate-700/80 font-medium text-[11px]">
+      <button onclick="setViewMode('population')" id="tab-pop" class="view-tab active px-3 py-1 rounded-md transition flex items-center gap-1.5 border border-transparent">
+        <span>👥</span> <span>セル母集団</span>
+      </button>
+      <button onclick="setViewMode('regime')" id="tab-regime" class="view-tab px-3 py-1 rounded-md transition flex items-center gap-1.5 border border-transparent text-slate-400 hover:text-slate-200">
+        <span>⚔️/📈</span> <span class="font-bold">統治相・優位体制</span>
+      </button>
+    </div>
+
+    <div class="hidden sm:flex items-center gap-3 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800 font-mono text-[11px]">
+      <div>Gen: <span id="hdrGen" class="text-cyan-400 font-semibold">0</span></div>
+      <span class="text-slate-700">|</span>
+      <div>Pop: <span id="hdrPop" class="text-emerald-400 font-semibold">0</span></div>
+      <span class="text-slate-700">|</span>
+      <div>FPS: <span id="hdrFps" class="text-slate-300">0</span></div>
+    </div>
+
+    <!-- Sound Toggle -->
+    <button id="btnSound" onclick="toggleSound()" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center gap-1.5 transition">
+      <span id="soundIcon">🔊</span>
+    </button>
+
+    <!-- Lean 4 Proof Modal Open Button -->
+    <button onclick="openTheoremModal()" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium flex items-center gap-1.5 shadow-md shadow-indigo-500/20 transition">
+      <span>📖</span> <span class="text-[11px]">Lean 4 定理集</span>
+    </button>
+  </div>
+</header>
+
+<!-- Main Grid Container -->
+<main class="p-3 sm:p-4 max-w-[1920px] mx-auto grid grid-cols-1 xl:grid-cols-12 gap-4">
+
+  <!-- ================= LEFT COLUMN: CONTROLS & MODEL PARAMS (3 cols) ================= -->
+  <aside class="xl:col-span-3 space-y-3.5">
+
+    <!-- 1. シミュレーション制御 -->
+    <div class="glass-panel rounded-xl p-3.5 space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+          <span class="w-1.5 h-3 bg-cyan-400 rounded-sm"></span>実行制御
+        </h2>
+        <span id="stateIndicator" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">PAUSED</span>
+      </div>
+
+      <div class="grid grid-cols-4 gap-2">
+        <button id="btnPlay" onclick="togglePlay()" class="btn-action col-span-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-900/30">
+          <span id="playIcon">▶</span> <span id="playText">実行開始</span>
+        </button>
+        <button onclick="stepSimulation()" class="btn-action bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2 rounded-lg border border-slate-700 flex items-center justify-center">
+          ⏭ 1step
+        </button>
+        <button onclick="resetSimulation()" class="btn-action bg-rose-950/60 hover:bg-rose-900/80 text-rose-200 py-2 rounded-lg border border-rose-800/40 flex items-center justify-center">
+          🔄 クリア
+        </button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <button onclick="randomizeGrid()" class="btn-action bg-cyan-900/40 hover:bg-cyan-800/60 text-cyan-200 py-1.5 rounded-lg border border-cyan-700/40 flex items-center justify-center gap-1 text-[11px]">
+          🎲 ランダム分布
+        </button>
+        <button onclick="triggerExternalShock()" class="btn-action bg-amber-900/40 hover:bg-amber-800/60 text-amber-200 py-1.5 rounded-lg border border-amber-700/40 flex items-center justify-center gap-1 text-[11px]" title="非定常環境ショック Δθ* による相の破壊力検定">
+          ⚡ 外部ショック
+        </button>
+      </div>
+
+      <div class="pt-1">
+        <div class="flex justify-between items-center text-[10px] text-slate-400 mb-1">
+          <span>実行速度</span>
+          <span class="font-mono text-cyan-300"><span id="speedVal">15</span> step/s</span>
+        </div>
+        <input type="range" id="speedSlider" min="1" max="50" value="15" class="slider-custom" oninput="updateSpeed()">
+      </div>
+    </div>
+
+    <!-- 2. セクション 7: 統治相パラメータ（暴力・法治・市場・アルゴリズム） -->
+    <div class="glass-panel rounded-xl p-3.5 space-y-3.5 border border-indigo-500/25">
+      <div class="flex items-center justify-between">
+        <h2 class="text-[11px] font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+          <span class="w-1.5 h-3 bg-indigo-400 rounded-sm"></span>統治相転移パラメータ (Sec 7)
+        </h2>
+        <span class="text-[9px] text-cyan-300 font-mono bg-cyan-950/60 px-1.5 py-0.5 rounded border border-cyan-800/40">Advanced</span>
+      </div>
+
+      <!-- アーカイブ長 L (記憶・記録の厚み) -->
+      <div>
+        <div class="flex justify-between items-center mb-0.5">
+          <span class="font-semibold text-slate-300">アーカイブ長 <span class="font-mono text-teal-300">L</span></span>
+          <span id="dispParamL" class="font-mono text-teal-400 font-bold">60</span>
+        </div>
+        <input type="range" id="paramL" min="0" max="150" value="60" class="slider-custom" oninput="applyModelParams()">
+        <div class="flex justify-between text-[9px] text-slate-400 mt-0.5">
+          <span>0 (暴力)</span>
+          <span>10 (法治)</span>
+          <span>50 (市場)</span>
+          <span>100+ (Algo)</span>
+        </div>
+      </div>
+
+      <!-- 情報劣化率 degRate (情報の風化・記録喪失) -->
+      <div>
+        <div class="flex justify-between items-center mb-0.5">
+          <span class="font-semibold text-slate-300">情報劣化率 <span class="font-mono text-rose-300">λ_deg</span></span>
+          <span id="dispDegRate" class="font-mono text-rose-400 font-bold">12</span>
+        </div>
+        <input type="range" id="paramDegRate" min="0" max="100" value="12" class="slider-custom" oninput="applyModelParams()">
+        <p class="text-[10px] text-slate-400 mt-0.5">高劣化(&gt;30)で市場・法治崩壊、&gt;60で完全な暴力退行 (Thm 7.1, 7.2)</p>
+      </div>
+
+      <!-- 市場独占レント搾取 capitalistRent -->
+      <div>
+        <div class="flex justify-between items-center mb-0.5">
+          <span class="font-semibold text-slate-300">市場独占レント <span class="font-mono text-amber-300">Rent_cap</span></span>
+          <span id="dispCapRent" class="font-mono text-amber-400 font-bold">15</span>
+        </div>
+        <input type="range" id="paramCapRent" min="0" max="80" value="15" class="slider-custom" oninput="applyModelParams()">
+        <p class="text-[10px] text-slate-400 mt-0.5">資本主義の独占歪みコスト。高いと市場厚生が下落し他相へ転移</p>
+      </div>
+
+      <!-- 暗号学的検証可能性 ν (verifiability) -->
+      <div>
+        <div class="flex justify-between items-center mb-0.5">
+          <span class="font-semibold text-slate-300">暗号学的検証性 <span class="font-mono text-cyan-300">ν (Verifiability)</span></span>
+          <span id="dispVerifiability" class="font-mono text-cyan-400 font-bold">85</span>
+        </div>
+        <input type="range" id="paramVerifiability" min="0" max="100" value="85" class="slider-custom" oninput="applyModelParams()">
+        <p class="text-[10px] text-slate-400 mt-0.5">不変ログ検証性 (ν ≥ 80) でアルゴリズム統治が解禁 (Thm 7.4)</p>
+      </div>
+    </div>
+
+    <!-- 3. 基本社会動学パラメータ (セクション 2, 3) -->
+    <div class="glass-panel rounded-xl p-3.5 space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+          <span class="w-1.5 h-3 bg-amber-400 rounded-sm"></span>基本動学係数 (Sec 2 & 3)
+        </h2>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 text-[10px]">
+        <div>
+          <div class="flex justify-between mb-0.5">
+            <span class="text-slate-400">公開度 α_log</span>
+            <span id="dispAlpha" class="font-mono text-cyan-400">0.60</span>
+          </div>
+          <input type="range" id="paramAlpha" min="0" max="100" value="60" class="slider-custom" oninput="applyModelParams()">
+        </div>
+        <div>
+          <div class="flex justify-between mb-0.5">
+            <span class="text-slate-400">同調圧力 s</span>
+            <span id="dispBullyS" class="font-mono text-amber-400">0.35</span>
+          </div>
+          <input type="range" id="paramBullyS" min="0" max="100" value="35" class="slider-custom" oninput="applyModelParams()">
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. 統治相プリセット（暴力 vs 市場 vs 法治 vs アルゴリズム） -->
+    <div class="glass-panel rounded-xl p-3.5 space-y-2">
+      <h2 class="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+        <span class="w-1.5 h-3 bg-pink-400 rounded-sm"></span>統治相転移シナリオ
+      </h2>
+      <div class="grid grid-cols-1 gap-1.5">
+        <button onclick="loadRegimeScenario('violence_primitive')" class="btn-action w-full text-left p-2 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 text-rose-200">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-[11px]">⚔️ 1. 原始・アナーキー【暴力優位相】</span>
+            <span class="badge-thm bg-rose-900 text-rose-200">Thm 7.2</span>
+          </div>
+          <div class="text-[10px] text-rose-300/80 mt-0.5">L=0, degRate=75。記録が成立せず物理的暴力のみが均衡</div>
+        </button>
+
+        <button onclick="loadRegimeScenario('rule_of_law')" class="btn-action w-full text-left p-2 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-800/40 text-emerald-200">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-[11px]">📜 2. 成文法治国家【法治優位相】</span>
+            <span class="badge-thm bg-emerald-900 text-emerald-200">Thm 7.3</span>
+          </div>
+          <div class="text-[10px] text-emerald-300/80 mt-0.5">L=30, degRate=20。条文記録により暴力支配を超克</div>
+        </button>
+
+        <button onclick="loadRegimeScenario('market_capitalism')" class="btn-action w-full text-left p-2 rounded-lg bg-amber-950/40 hover:bg-amber-900/60 border border-amber-800/40 text-amber-200">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-[11px]">📈 3. 資本主義経済【市場経済優位相】</span>
+            <span class="badge-thm bg-amber-900 text-amber-200">Sec 7 </span>
+          </div>
+          <div class="text-[10px] text-amber-300/80 mt-0.5">L=70, degRate=8。信用履歴と価格メカニズムで最大余剰</div>
+        </button>
+
+        <button onclick="loadRegimeScenario('algorithmic_ai')" class="btn-action w-full text-left p-2 rounded-lg bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-800/40 text-cyan-200">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-[11px]">🌐 4. ポスト資本主義【アルゴリズム統治優位相】</span>
+            <span class="badge-thm bg-cyan-900 text-cyan-200">Thm 7.4 & 7.5</span>
+          </div>
+          <div class="text-[10px] text-cyan-300/80 mt-0.5">L=120, ν=95, deg=3。検証可能AIが市場レントを超克</div>
+        </button>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ================= CENTER COLUMN: CANVAS & REGIME COMPASS (6 cols) ================= -->
+  <section class="xl:col-span-6 flex flex-col gap-3">
+
+    <!-- Top Regime Status Banner -->
+    <div id="regimeTopBanner" class="glass-panel rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 border-l-4 border-amber-400">
+      <div class="flex items-center gap-3">
+        <div id="dominantIcon" class="text-3xl">📈</div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">支配的統治体制 (Dominant Regime)</span>
+            <span id="dominantBadge" class="badge-thm bg-amber-950 text-amber-300 border border-amber-700/50">MARKET DOMINANT</span>
+          </div>
+          <h2 id="dominantTitle" class="text-base font-bold text-white mt-0.5">資本主義・市場経済優位相</h2>
+          <p id="dominantDesc" class="text-[10px] text-slate-300 mt-0.5 leading-relaxed">
+            十分な信用履歴（L ≥ 50）と低劣化により、市場交換余剰が法秩序や暴力を上回り最大厚生を実現中。
+          </p>
+        </div>
+      </div>
+
+      <!-- Quick Welfare Score Table -->
+      <div class="flex items-center gap-2 bg-slate-900/80 px-3 py-2 rounded-lg border border-slate-800 text-[10px] font-mono">
+        <div class="text-center px-1">
+          <div class="text-rose-400 font-bold">W(暴力)</div>
+          <div id="scoreWViolence" class="text-white text-xs mt-0.5">20</div>
+        </div>
+        <div class="text-slate-700">|</div>
+        <div class="text-center px-1">
+          <div class="text-emerald-400 font-bold">W(法治)</div>
+          <div id="scoreWRuleOfLaw" class="text-white text-xs mt-0.5">53</div>
+        </div>
+        <div class="text-slate-700">|</div>
+        <div class="text-center px-1">
+          <div class="text-amber-400 font-bold">W(市場)</div>
+          <div id="scoreWMarket" class="text-amber-300 text-xs mt-0.5 font-bold">73</div>
+        </div>
+        <div class="text-slate-700">|</div>
+        <div class="text-center px-1">
+          <div class="text-cyan-400 font-bold">W(Algo)</div>
+          <div id="scoreWAlgo" class="text-white text-xs mt-0.5">--</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Canvas Card -->
+    <div class="glass-panel rounded-xl p-2.5 relative flex flex-col items-center justify-center overflow-hidden">
+      
+      <!-- View Mode Indicator Pill -->
+      <div class="absolute top-4 left-4 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/90 border border-slate-700 text-[10px] font-mono backdrop-blur-md">
+        <span id="canvasModeDot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="canvasModeLabel" class="text-slate-200 font-semibold">母集団モード (Population View)</span>
+      </div>
+
+      <!-- Canvas Wrapper -->
+      <div id="canvasBox" class="relative w-full flex items-center justify-center">
+        <canvas id="gameCanvas" class="rounded-lg shadow-2xl bg-[#090d16] border border-slate-800/80"></canvas>
+
+        <!-- Cell Hover HUD Tooltip -->
+        <div id="cellTooltip" class="absolute hidden z-30 bg-slate-900/95 border border-cyan-500/50 rounded-lg p-2.5 shadow-xl text-[10px] font-mono backdrop-blur-md pointer-events-none w-56">
+          <div class="flex items-center justify-between border-b border-slate-700/60 pb-1 mb-1.5">
+            <span id="ttType" class="font-bold text-white">Citizen</span>
+            <span id="ttCoord" class="text-slate-400">(x:0, y:0)</span>
+          </div>
+          <div class="space-y-1">
+            <div class="flex justify-between">
+              <span class="text-slate-400">局所支配相:</span>
+              <span id="ttRegime" class="text-amber-300 font-bold">Market</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400">蓄積ストレス:</span>
+              <span id="ttStress" class="text-rose-400">0.45</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400">順応利得 Π^Copy:</span>
+              <span id="ttPayCopy" class="text-emerald-400">+12</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400">テロ利得 Π^Terror:</span>
+              <span id="ttPayTerror" class="text-rose-400">-5</span>
+            </div>
+            <div class="flex justify-between border-t border-slate-800 pt-1">
+              <span class="text-indigo-300">必要援助 T_min:</span>
+              <span id="ttTmin" class="text-indigo-400">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Shock Overlay -->
+        <div id="shockOverlay" class="absolute inset-0 bg-amber-500/20 rounded-lg pointer-events-none opacity-0 transition-opacity duration-300 flex items-center justify-center">
+          <div class="text-center font-bold font-mono text-amber-300 text-lg tracking-widest bg-slate-900/80 px-4 py-2 rounded-xl border border-amber-500/50 shadow-2xl">
+            ⚡ NON-STATIONARY SHOCK Δθ* ⚡
+          </div>
+        </div>
+      </div>
+
+      <!-- Legend Footer -->
+      <div id="legendContainer" class="w-full mt-2 px-2 flex flex-wrap items-center justify-between text-[11px] text-slate-400 gap-2">
+        <!-- Population Legend -->
+        <div id="popLegend" class="flex items-center gap-3">
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Citizen</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber-400"></span> Bully</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-rose-500"></span> Terrorist</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-indigo-400"></span> AI Support</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-sky-400"></span> Breakthrough</span>
+        </div>
+
+        <!-- Regime Legend (Hidden by default, toggled in Regime view) -->
+        <div id="regimeLegend" class="hidden flex items-center gap-3">
+          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-rose-600"></span> ⚔️ 暴力優位相</span>
+          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-orange-500"></span> 📜 物語統治相</span>
+          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500"></span> ⚖️ 法治優位相</span>
+          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-amber-400"></span> 📈 市場経済優位相</span>
+          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-cyan-400"></span> 🌐 Algo統治優位相</span>
+        </div>
+
+        <div class="font-mono text-[10px] text-slate-500">
+          Grid: 120 x 75
+        </div>
+      </div>
+    </div>
+
+    <!-- Comparative Welfare Bar Card -->
+    <div class="glass-panel rounded-xl p-3.5 space-y-2.5">
+      <div class="flex justify-between items-center">
+        <h3 class="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+          <span>📊</span> 各ガバナンス形態の社会純厚生 W(Regime) と成立判定 (Lean 4 Sec 7)
+        </h3>
+        <span class="text-[9px] text-slate-400 font-mono">不等式成立かつ厚生最大が支配相</span>
+      </div>
+
+      <!-- Regime Welfare Horizontal Bars -->
+      <div class="space-y-1.5 font-mono text-[10px]">
+        <!-- 1. 暴力支配 -->
+        <div>
+          <div class="flex justify-between text-slate-300 mb-0.5">
+            <span class="flex items-center gap-1.5"><span class="w-2 h-2 bg-rose-600 rounded-sm"></span> 物理・暴力支配相 (Violence)</span>
+            <span class="text-rose-400 font-bold">W = 20 <span class="text-[9px] text-emerald-400 ml-1 font-normal">[成立: 常に真]</span></span>
+          </div>
+          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+            <div id="barWViolence" class="bg-rose-600 h-full w-[20%] transition-all duration-300"></div>
+          </div>
+        </div>
+
+        <!-- 2. 成文法治 -->
+        <div>
+          <div class="flex justify-between text-slate-300 mb-0.5">
+            <span class="flex items-center gap-1.5"><span class="w-2 h-2 bg-emerald-500 rounded-sm"></span> 成文法・法治統治相 (Rule of Law)</span>
+            <span class="text-emerald-400 font-bold"><span id="lblWRuleOfLaw">W = 53</span> <span id="feasRuleOfLaw" class="text-[9px] ml-1">[成立: L≥10, deg≤30]</span></span>
+          </div>
+          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+            <div id="barWRuleOfLaw" class="bg-emerald-500 h-full w-[53%] transition-all duration-300"></div>
+          </div>
+        </div>
+
+        <!-- 3. 市場・資本主義 -->
+        <div>
+          <div class="flex justify-between text-slate-300 mb-0.5">
+            <span class="flex items-center gap-1.5"><span class="w-2 h-2 bg-amber-400 rounded-sm"></span> 評価・市場投票相 (Market/Capitalism)</span>
+            <span class="text-amber-400 font-bold"><span id="lblWMarket">W = 73</span> <span id="feasMarket" class="text-[9px] ml-1">[成立: L≥50, deg≤15]</span></span>
+          </div>
+          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+            <div id="barWMarket" class="bg-amber-400 h-full w-[73%] transition-all duration-300"></div>
+          </div>
+        </div>
+
+        <!-- 4. アルゴリズム統治 -->
+        <div>
+          <div class="flex justify-between text-slate-300 mb-0.5">
+            <span class="flex items-center gap-1.5"><span class="w-2 h-2 bg-cyan-400 rounded-sm"></span> 検証可能アルゴリズム統治相 (Algorithmic)</span>
+            <span class="text-cyan-400 font-bold"><span id="lblWAlgo">W = 166</span> <span id="feasAlgo" class="text-[9px] ml-1">[未解禁: L≥100, ν≥80, deg≤5]</span></span>
+          </div>
+          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+            <div id="barWAlgo" class="bg-cyan-400 h-full w-[0%] transition-all duration-300"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ================= RIGHT COLUMN: CHARTS, LOGS & THEOREMS (3 cols) ================= -->
+  <aside class="xl:col-span-3 space-y-3.5">
+
+    <!-- Timeline Chart -->
+    <div class="glass-panel rounded-xl p-3">
+      <div class="flex justify-between items-center mb-1.5">
+        <h3 class="text-[11px] font-bold text-slate-300 uppercase tracking-wider">勢力・人口タイムライン</h3>
+        <span class="text-[9px] text-slate-500 font-mono">Last 100 gen</span>
+      </div>
+      <div class="h-36 w-full">
+        <canvas id="timelineChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Theorem Event Log -->
+    <div class="glass-panel rounded-xl p-3.5 space-y-2.5">
+      <div class="flex justify-between items-center">
+        <h2 class="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+          <span class="w-1.5 h-3 bg-cyan-400 rounded-sm"></span>相転移イベントログ
+        </h2>
+        <button onclick="clearEventLogs()" class="text-[9px] text-slate-500 hover:text-slate-300 transition">
+          クリア
+        </button>
+      </div>
+
+      <div id="theoremLogBox" class="h-64 overflow-y-auto space-y-1.5 pr-1 font-mono text-[10px]">
+        <div class="p-2 rounded bg-slate-800/50 border border-slate-700/60 text-slate-300">
+          <div class="flex items-center justify-between">
+            <span class="badge-thm bg-indigo-900/80 text-indigo-200">System Ready</span>
+            <span class="text-slate-500 text-[9px]">Gen 0</span>
+          </div>
+          <p class="mt-1 text-slate-400">セクション 7 統治相転移エンジン起動。上部タブで「統治相・優位体制」表示に切り替え可能です。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Reference of Section 7 Theorems -->
+    <div class="glass-panel rounded-xl p-3.5 space-y-2">
+      <h2 class="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+        <span class="w-1.5 h-3 bg-amber-400 rounded-sm"></span>統治相転移定理マッピング (Sec 7)
+      </h2>
+      <div class="space-y-1.5 text-[10px]">
+        <div class="flex items-center justify-between p-1.5 rounded bg-slate-800/30 border border-slate-800">
+          <span class="badge-thm bg-rose-950 text-rose-300">Thm 7.2</span>
+          <span class="text-slate-300 text-right">極限劣化 (deg&gt;60) → 完全な暴力退行</span>
+        </div>
+        <div class="flex items-center justify-between p-1.5 rounded bg-slate-800/30 border border-slate-800">
+          <span class="badge-thm bg-emerald-950 text-emerald-300">Thm 7.3</span>
+          <span class="text-slate-300 text-right">記録伸長 L ≥ 10 → 法治国家の自発的解禁</span>
+        </div>
+        <div class="flex items-center justify-between p-1.5 rounded bg-slate-800/30 border border-slate-800">
+          <span class="badge-thm bg-amber-950 text-amber-300">Thm 7.3b</span>
+          <span class="text-slate-300 text-right">信用履歴 L ≥ 50 → 市場・資本主義の解禁</span>
+        </div>
+        <div class="flex items-center justify-between p-1.5 rounded bg-slate-800/30 border border-slate-800">
+          <span class="badge-thm bg-cyan-950 text-cyan-300">Thm 7.4</span>
+          <span class="text-slate-300 text-right">検証性 ν ≥ 80 → 市場レントの厳密超克</span>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+</main>
+
+<!-- ================= LEAN 4 THEOREMS MODAL ================= -->
+<div id="theoremModal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4">
+  <div class="glass-panel w-full max-w-4xl max-h-[90vh] rounded-2xl flex flex-col shadow-2xl border border-indigo-500/40 overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
+      <div class="flex items-center gap-2.5">
+        <span class="text-xl">📖</span>
+        <div>
+          <h2 class="text-sm font-bold text-white">Lean 4 形式化モデル 定理集 (Basic.lean)</h2>
+          <p class="text-[11px] text-slate-400">セクション 7: 評価保存能力・情報劣化率による動的ガバナンス相転移と資本主義超克定理</p>
+        </div>
+      </div>
+      <button onclick="closeTheoremModal()" class="text-slate-400 hover:text-white text-lg font-bold px-2 py-1 rounded">✕</button>
+    </div>
+
+    <div class="p-6 overflow-y-auto space-y-5 text-xs text-slate-300 leading-relaxed">
+      <!-- Theorem 7.2 -->
+      <div class="p-4 rounded-xl bg-slate-900/90 border border-rose-500/30 space-y-2">
+        <div class="flex items-center gap-2">
+          <span class="badge-thm bg-rose-900 text-rose-200">Theorem 7.2</span>
+          <span class="font-bold text-white text-sm">極限情報劣化における完全な暴力支配への退行定理</span>
+        </div>
+        <p class="text-slate-400">
+          アーカイブ長 L がいかに大きくとも、情報劣化率 <code class="text-rose-300">degRate &gt; 60</code> の極限崩壊環境においては、成文法治・市場・物語のすべてが成立不可能となり、外部記録に依存しない物理的暴力支配（<code class="text-rose-300">W(Violence)=20</code>）のみが唯一成立する。
+        </p>
+        <pre class="bg-black/60 p-3 rounded-lg text-rose-400 font-mono text-[11px] overflow-x-auto"><code>theorem extreme_degradation_forces_violence
+    (p : AdvancedGovernanceParams)
+    (h_extreme : p.degRate > 60) :
+    ¬ isNarrativeFeasible p ∧
+    ¬ isRuleOfLawFeasible p ∧
+    ¬ isMarketFeasible p ∧
+    ¬ isAlgorithmicGovernanceFeasible p := by ...</code></pre>
+      </div>
+
+      <!-- Theorem 7.4 -->
+      <div class="p-4 rounded-xl bg-slate-900/90 border border-cyan-500/30 space-y-2">
+        <div class="flex items-center gap-2">
+          <span class="badge-thm bg-cyan-900 text-cyan-200">Theorem 7.4</span>
+          <span class="font-bold text-white text-sm">検証可能アルゴリズム統治による資本主義的評価（市場）の厳密超克定理</span>
+        </div>
+        <p class="text-slate-400">
+          暗号学的検証可能性 <code class="text-cyan-300">ν ≥ 80</code> と包摂性 <code class="text-cyan-300">α_trans ≥ 80</code>、長期ログ <code class="text-cyan-300">L ≥ 100</code> が整ったとき、アルゴリズム統治の社会純厚生は、独占レント搾取と情報風化を抱える市場・資本主義の純厚生を数学的に厳密に凌駕する。
+        </p>
+        <pre class="bg-black/60 p-3 rounded-lg text-cyan-400 font-mono text-[11px] overflow-x-auto"><code>theorem algorithmic_strictly_dominates_market
+    (p : AdvancedGovernanceParams)
+    (h_mkt  : isMarketFeasible p)
+    (h_algo : isAlgorithmicGovernanceFeasible p) :
+    welfareAlgorithmic p > welfareMarket p := by ...</code></pre>
+      </div>
+    </div>
+
+    <div class="px-6 py-3 border-t border-slate-800 bg-slate-900/80 flex justify-end">
+      <button onclick="closeTheoremModal()" class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= JAVASCRIPT SIMULATION LOGIC ================= -->
+<script>
+/* ==========================================================================
+   Lean 4 Section 7 Regime Transitions & Social Dynamics Engine
+   ========================================================================== */
+
+const EMPTY       = 0;
+const CITIZEN     = 1;
+const BULLY       = 2;
+const TERRORIST   = 3;
+const AI_SUPPORT  = 4;
+const BREAKTHROUGH= 5;
+
+// Regime ID Constants (Sec 7)
+const REGIME_VIOLENCE    = 'violence';
+const REGIME_NARRATIVE   = 'narrative';
+const REGIME_RULEOFLAW   = 'ruleoflaw';
+const REGIME_MARKET      = 'market';
+const REGIME_ALGORITHMIC = 'algorithmic';
+
+const POP_COLORS = {
+  [EMPTY]:        '#090d16',
+  [CITIZEN]:      '#34d399',
+  [BULLY]:        '#f59e0b',
+  [TERRORIST]:    '#f43f5e',
+  [AI_SUPPORT]:   '#818cf8',
+  [BREAKTHROUGH]: '#38bdf8',
+};
+
+const REGIME_COLORS = {
+  [REGIME_VIOLENCE]:    '#e11d48', // Crimson Rose
+  [REGIME_NARRATIVE]:   '#f97316', // Orange
+  [REGIME_RULEOFLAW]:   '#10b981', // Emerald
+  [REGIME_MARKET]:      '#fbbf24', // Amber/Gold
+  [REGIME_ALGORITHMIC]: '#06b6d4', // Cyan
+};
+
+const COLS = 120;
+const ROWS = 75;
+let CELL_PX = 7;
+
+let grid = new Uint8Array(COLS * ROWS);
+let nextGrid = new Uint8Array(COLS * ROWS);
+let stressGrid = new Float32Array(COLS * ROWS);
+let nextStress = new Float32Array(COLS * ROWS);
+let zkGrid = new Float32Array(COLS * ROWS);
+let nextZk = new Float32Array(COLS * ROWS);
+
+// Runtime & UI Mode
+let viewMode = 'population'; // 'population' or 'regime'
+let generation = 0;
+let isRunning = false;
+let stepInterval = 1000 / 15;
+let lastStepTime = 0;
+let animFrameId = null;
+let soundEnabled = true;
+
+// Lean 4 Model Parameters (Sec 2, 3, 7)
+let params = {
+  alpha: 0.60,
+  bully_s: 0.35,
+  ai_rate: 0.45,
+  // Section 7 Parameters:
+  L: 60,                 // Archive length
+  degRate: 12,           // Information degradation rate [0, 100]
+  capitalistRent: 15,    // Market monopoly rent exploitation
+  verifiability: 85,     // Cryptographic verifiability ν [0, 100]
+  inclusivity: 85,       // Inclusive transparency [0, 100]
+  algorithmicSurplus: 40 // Surplus from AI friction reduction
+};
+
+// Particles
+let particles = [];
+
+// Audio
+let audioCtx = null;
+function initAudio() {
+  if (!audioCtx) {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext) audioCtx = new AudioContext();
+  }
+}
+function playTone(freq, type = 'sine', duration = 0.1, gainVal = 0.05) {
+  if (!soundEnabled || !audioCtx) return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(gainVal, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  } catch (e) {}
+}
+function toggleSound() {
+  initAudio();
+  soundEnabled = !soundEnabled;
+  document.getElementById('soundIcon').textContent = soundEnabled ? '🔊' : '🔇';
+}
+
+// Canvas Setup
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  const container = document.getElementById('canvasBox');
+  const maxWidth = container.clientWidth - 16;
+  const maxHeight = Math.min(window.innerHeight * 0.50, 540);
+  CELL_PX = Math.max(4, Math.min(Math.floor(maxWidth / COLS), Math.floor(maxHeight / ROWS)));
+  canvas.width = COLS * CELL_PX;
+  canvas.height = ROWS * CELL_PX;
+  renderCanvas();
+}
+
+function idx(x, y) { return y * COLS + x; }
+
+// ==========================================================================
+// LEAN 4 SECTION 7: REGIME FEASIBILITY & WELFARE FUNCTIONS
+// ==========================================================================
+
+function evalRegimes(p, localStress = 0, localBullyRatio = 0) {
+  // Local variations influenced by bully density and stress
+  const effectiveDeg = Math.min(100, Math.max(0, p.degRate + Math.round(localBullyRatio * 30)));
+  const effectiveL = Math.max(0, p.L - Math.round(localStress * 20));
+
+  // 1. Feasibility Predicates (Lean 4 Basic.lean line 872-888)
+  const isViolenceFeasible = true;
+  const isNarrativeFeasible = (effectiveL > 0 && effectiveDeg <= 60);
+  const isRuleOfLawFeasible = (effectiveL >= 10 && effectiveDeg <= 30);
+  const isMarketFeasible = (effectiveL >= 50 && effectiveDeg <= 15);
+  const isAlgorithmicFeasible = (effectiveL >= 100 && effectiveDeg <= 5 && p.verifiability >= 80 && p.inclusivity >= 80);
+
+  // 2. Welfare Functions (Lean 4 Basic.lean line 896-914)
+  const wViolence = 20;
+  const wNarrative = 45 - Math.floor(effectiveDeg / 2);
+  const wRuleOfLaw = 65 - effectiveDeg;
+  const wMarket = 100 - p.capitalistRent - effectiveDeg;
+  const wAlgorithmic = 100 + p.algorithmicSurplus + Math.floor((p.verifiability + p.inclusivity) / 2) - 2 * effectiveDeg;
+
+  // Determine Dominant Regime (Maximum feasible welfare)
+  let bestRegime = REGIME_VIOLENCE;
+  let bestWelfare = wViolence;
+
+  if (isNarrativeFeasible && wNarrative > bestWelfare) {
+    bestRegime = REGIME_NARRATIVE;
+    bestWelfare = wNarrative;
+  }
+  if (isRuleOfLawFeasible && wRuleOfLaw > bestWelfare) {
+    bestRegime = REGIME_RULEOFLAW;
+    bestWelfare = wRuleOfLaw;
+  }
+  if (isMarketFeasible && wMarket > bestWelfare) {
+    bestRegime = REGIME_MARKET;
+    bestWelfare = wMarket;
+  }
+  if (isAlgorithmicFeasible && wAlgorithmic > bestWelfare) {
+    bestRegime = REGIME_ALGORITHMIC;
+    bestWelfare = wAlgorithmic;
+  }
+
+  return {
+    bestRegime,
+    bestWelfare,
+    feas: {
+      violence: isViolenceFeasible,
+      narrative: isNarrativeFeasible,
+      ruleoflaw: isRuleOfLawFeasible,
+      market: isMarketFeasible,
+      algorithmic: isAlgorithmicFeasible
+    },
+    welfare: {
+      violence: wViolence,
+      narrative: wNarrative,
+      ruleoflaw: wRuleOfLaw,
+      market: wMarket,
+      algorithmic: wAlgorithmic
+    }
+  };
+}
+
+// ==========================================================================
+// SIMULATION STEP FUNCTION
+// ==========================================================================
+
+function countNeighbors(g, cx, cy) {
+  let counts = { total: 0, [CITIZEN]: 0, [BULLY]: 0, [TERRORIST]: 0, [AI_SUPPORT]: 0, [BREAKTHROUGH]: 0 };
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const nx = (cx + dx + COLS) % COLS;
+      const ny = (cy + dy + ROWS) % ROWS;
+      const st = g[idx(nx, ny)];
+      if (st !== EMPTY) {
+        counts.total++;
+        counts[st] = (counts[st] || 0) + 1;
+      }
+    }
+  }
+  return counts;
+}
+
+function computeCellPayoffs(st, stress, zk, n) {
+  const s = params.bully_s;
+  const alpha = params.alpha;
+  const pi_in = 20;
+  const C_copy = Math.round(15 * s + zk * 20);
+  const S_harm = Math.round(n[BULLY] * s * 12);
+  const pi_alt = 10;
+  const C_exit = Math.round(25 * (1 - params.L / 200));
+  const pi_ruin = -15;
+  const R_ressentiment = Math.round((stress * 30) + (s * 25));
+  const C_atk = Math.round(10 + alpha * 35);
+
+  const pi_copy = pi_in - C_copy - S_harm;
+  const pi_exit = pi_alt - C_exit;
+  const pi_terror = pi_ruin + R_ressentiment - C_atk;
+  const T_min = Math.max(0, pi_terror - pi_copy);
+  return { pi_copy, pi_exit, pi_terror, T_min };
+}
+
+function stepSimulation() {
+  nextGrid.set(grid);
+  nextStress.set(stressGrid);
+  nextZk.set(zkGrid);
+
+  const globalRegime = evalRegimes(params).bestRegime;
+
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      const i = idx(x, y);
+      const st = grid[i];
+      const stress = stressGrid[i];
+      const zk = zkGrid[i];
+      const n = countNeighbors(grid, x, y);
+
+      let nextSt = st;
+      let nextStr = stress;
+      let nextZ = zk;
+
+      // 1. Birth
+      if (st === EMPTY) {
+        if (n.total === 3) {
+          // If violence is dominant, birth skews toward bullies and strife
+          if (globalRegime === REGIME_VIOLENCE) {
+            nextSt = Math.random() < 0.6 ? BULLY : CITIZEN;
+          } else if (globalRegime === REGIME_ALGORITHMIC) {
+            nextSt = Math.random() < 0.4 ? AI_SUPPORT : (Math.random() < 0.3 ? BREAKTHROUGH : CITIZEN);
+          } else {
+            if (n[BULLY] >= 2) nextSt = BULLY;
+            else if (n[AI_SUPPORT] >= 2) nextSt = AI_SUPPORT;
+            else nextSt = CITIZEN;
+          }
+          nextStr = 0.05;
+          nextZ = Math.random() * 0.5;
+        }
+      }
+      // 2. Occupied
+      else {
+        const payoffs = computeCellPayoffs(st, stress, zk, n);
+        const classicSurvives = (n.total === 2 || n.total === 3);
+
+        if (st === CITIZEN) {
+          if (!classicSurvives) {
+            nextSt = EMPTY; nextStr = 0;
+          } else {
+            const bullyPressure = n[BULLY] * params.bully_s * 0.25;
+            nextStr = Math.min(1.0, stress + bullyPressure);
+
+            // Terror phase transition
+            if (payoffs.pi_terror > Math.max(payoffs.pi_copy, payoffs.pi_exit) && nextStr > 0.65) {
+              nextSt = TERRORIST;
+            } else if (bullyPressure > 0.45 && Math.random() < bullyPressure * 0.3) {
+              nextSt = BULLY;
+            }
+          }
+        }
+        else if (st === BULLY) {
+          const bullySurvives = (n.total >= 2 && n.total <= 4);
+          if (!bullySurvives) {
+            nextSt = EMPTY; nextStr = 0;
+          } else {
+            // Under Rule of Law or Algorithmic, bully arbitrary sanction is checked
+            if (globalRegime === REGIME_RULEOFLAW || globalRegime === REGIME_ALGORITHMIC) {
+              if (Math.random() < 0.15) nextSt = CITIZEN;
+            }
+            nextStr = Math.min(1.0, stress + n[BULLY] * 0.08 * params.bully_s);
+            if (nextStr > 0.85 && n[BULLY] >= 3 && Math.random() < 0.2) {
+              nextSt = TERRORIST;
+            }
+          }
+        }
+        else if (st === TERRORIST) {
+          if (stress >= 0.8 || Math.random() < 0.35) {
+            // Explosion
+            playTone(160, 'sawtooth', 0.2, 0.1);
+            const r = params.bully_s > 0.5 ? 2 : 1;
+            for (let dy = -r; dy <= r; dy++) {
+              for (let dx = -r; dx <= r; dx++) {
+                const tx = (x + dx + COLS) % COLS;
+                const ty = (y + dy + ROWS) % ROWS;
+                const ti = idx(tx, ty);
+                if (nextGrid[ti] !== AI_SUPPORT || Math.random() < 0.4) {
+                  nextGrid[ti] = EMPTY;
+                  nextStress[ti] = 0;
+                }
+              }
+            }
+            nextSt = EMPTY; nextStr = 0;
+          } else {
+            nextStr = Math.min(1.0, stress + 0.15);
+            if (n[AI_SUPPORT] > 0 && Math.random() < params.ai_rate * 0.7) {
+              nextSt = CITIZEN; nextStr = 0.1;
+            }
+          }
+        }
+        else if (st === AI_SUPPORT) {
+          if (n.total < 1 || n.total > 5) {
+            nextSt = EMPTY; nextStr = 0;
+          } else {
+            for (let dy = -1; dy <= 1; dy++) {
+              for (let dx = -1; dx <= 1; dx++) {
+                if (dx === 0 && dy === 0) continue;
+                const tx = (x + dx + COLS) % COLS;
+                const ty = (y + dy + ROWS) % ROWS;
+                const ti = idx(tx, ty);
+                if (nextGrid[ti] === TERRORIST && Math.random() < params.ai_rate * 0.5) {
+                  nextGrid[ti] = CITIZEN;
+                  nextStress[ti] = 0.1;
+                }
+              }
+            }
+          }
+        }
+        else if (st === BREAKTHROUGH) {
+          if (!classicSurvives) { nextSt = EMPTY; nextStr = 0; }
+        }
+      }
+
+      nextGrid[i] = nextSt;
+      nextStress[i] = Math.max(0, Math.min(1.0, nextStr));
+      nextZk[i] = nextZ;
+    }
+  }
+
+  grid.set(nextGrid);
+  stressGrid.set(nextStress);
+  zkGrid.set(nextZk);
+  generation++;
+
+  updateMetricsAndRegimeUI();
+}
+
+// ==========================================================================
+// REGIME UI & METRICS UPDATE
+// ==========================================================================
+
+function updateMetricsAndRegimeUI() {
+  let counts = { [CITIZEN]: 0, [BULLY]: 0, [TERRORIST]: 0, [AI_SUPPORT]: 0, [BREAKTHROUGH]: 0 };
+  let totalStress = 0, occupied = 0;
+
+  for (let i = 0; i < grid.length; i++) {
+    const st = grid[i];
+    if (st !== EMPTY) {
+      counts[st] = (counts[st] || 0) + 1;
+      totalStress += stressGrid[i];
+      occupied++;
+    }
+  }
+
+  document.getElementById('hdrGen').textContent = generation;
+  document.getElementById('hdrPop').textContent = occupied;
+
+  // Evaluate Lean 4 Regimes
+  const avgStress = occupied > 0 ? totalStress / occupied : 0;
+  const bullyRatio = occupied > 0 ? counts[BULLY] / occupied : 0;
+  const regimeRes = evalRegimes(params, avgStress, bullyRatio);
+
+  updateRegimeBanner(regimeRes);
+  updateWelfareBars(regimeRes);
+
+  // Push chart
+  historyData.labels.push(generation);
+  historyData.citizen.push(counts[CITIZEN]);
+  historyData.bully.push(counts[BULLY]);
+  historyData.terrorist.push(counts[TERRORIST]);
+  historyData.ai.push(counts[AI_SUPPORT]);
+  historyData.breakthru.push(counts[BREAKTHROUGH]);
+  if (historyData.labels.length > 80) {
+    historyData.labels.shift();
+    historyData.citizen.shift();
+    historyData.bully.shift();
+    historyData.terrorist.shift();
+    historyData.ai.shift();
+    historyData.breakthru.shift();
+  }
+  if (generation % 2 === 0 && timelineChart) timelineChart.update('none');
+}
+
+function updateRegimeBanner(r) {
+  const dom = r.bestRegime;
+  const banner = document.getElementById('regimeTopBanner');
+  const icon = document.getElementById('dominantIcon');
+  const badge = document.getElementById('dominantBadge');
+  const title = document.getElementById('dominantTitle');
+  const desc = document.getElementById('dominantDesc');
+
+  const configs = {
+    [REGIME_VIOLENCE]: {
+      icon: '⚔️',
+      badge: 'VIOLENCE DOMINANT',
+      badgeClass: 'bg-rose-950 text-rose-300 border-rose-700/60',
+      borderClass: 'border-rose-500',
+      title: '原始・アナーキー【物理・暴力支配相】',
+      desc: '極限劣化または記録消失により高度な制度が崩壊。外部記録不要の物理的暴力均衡（W=20）に退行しています (Lean 4 定理 7.2)。'
+    },
+    [REGIME_NARRATIVE]: {
+      icon: '📜',
+      badge: 'NARRATIVE DOMINANT',
+      badgeClass: 'bg-orange-950 text-orange-300 border-orange-700/60',
+      borderClass: 'border-orange-500',
+      title: '理念・神話【口伝物語統治相】',
+      desc: '共有記憶と物語による協調余剰が暴力を上回り機能中。成文法治までの過渡的共同体秩序です。'
+    },
+    [REGIME_RULEOFLAW]: {
+      icon: '⚖️',
+      badge: 'RULE OF LAW DOMINANT',
+      badgeClass: 'bg-emerald-950 text-emerald-300 border-emerald-700/60',
+      borderClass: 'border-emerald-500',
+      title: '規範・成文法【近代法治国家相】',
+      desc: '成文アーカイブ (L ≥ 10) と低劣化により、恣意的暴力が排除され法秩序による協調余剰が最大化しています (Lean 4 定理 7.3)。'
+    },
+    [REGIME_MARKET]: {
+      icon: '📈',
+      badge: 'MARKET DOMINANT',
+      badgeClass: 'bg-amber-950 text-amber-300 border-amber-700/60',
+      borderClass: 'border-amber-500',
+      title: '資本主義【市場経済優位相】',
+      desc: '信用履歴（L ≥ 50）と低劣化により、市場交換余剰が法治や暴力を凌駕。独占レント搾取があってもなお高効率を実現 (Lean 4 Sec 7)。'
+    },
+    [REGIME_ALGORITHMIC]: {
+      icon: '🌐',
+      badge: 'ALGORITHMIC DOMINANT',
+      badgeClass: 'bg-cyan-950 text-cyan-300 border-cyan-700/60',
+      borderClass: 'border-cyan-500',
+      title: 'ポスト資本主義【暗号学的アルゴリズム統治相】',
+      desc: '不変ログ (L ≥ 100) と検証性 (ν ≥ 80) により、市場経済の独占レント搾取を超克し、最高福祉を達成 (Lean 4 定理 7.4 & 7.5)。'
+    }
+  };
+
+  const c = configs[dom] || configs[REGIME_VIOLENCE];
+  icon.textContent = c.icon;
+  badge.textContent = c.badge;
+  badge.className = `badge-thm ${c.badgeClass}`;
+  banner.className = `glass-panel rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 border-l-4 ${c.borderClass}`;
+  title.textContent = c.title;
+  desc.textContent = c.desc;
+
+  // Mini Scores
+  document.getElementById('scoreWViolence').textContent = r.welfare.violence;
+  document.getElementById('scoreWRuleOfLaw').textContent = r.feas.ruleoflaw ? r.welfare.ruleoflaw : '不可';
+  document.getElementById('scoreWMarket').textContent = r.feas.market ? r.welfare.market : '不可';
+  document.getElementById('scoreWAlgo').textContent = r.feas.algorithmic ? r.welfare.algorithmic : '不可';
+}
+
+function updateWelfareBars(r) {
+  const maxW = 200; // Normalization base
+  const w = r.welfare;
+  const f = r.feas;
+
+  // Violence
+  document.getElementById('barWViolence').style.width = `${(w.violence / maxW) * 100}%`;
+
+  // Rule of Law
+  const elRuleLbl = document.getElementById('lblWRuleOfLaw');
+  const elRuleFeas = document.getElementById('feasRuleOfLaw');
+  const elRuleBar = document.getElementById('barWRuleOfLaw');
+  elRuleLbl.textContent = `W = ${w.ruleoflaw}`;
+  if (f.ruleoflaw) {
+    elRuleFeas.textContent = '[解禁・成立]';
+    elRuleFeas.className = 'text-[9px] text-emerald-400 ml-1';
+    elRuleBar.style.width = `${Math.max(0, (w.ruleoflaw / maxW) * 100)}%`;
+    elRuleBar.className = 'bg-emerald-500 h-full transition-all duration-300';
+  } else {
+    elRuleFeas.textContent = `[不成立: L=${params.L}<10 又は deg=${params.degRate}>30]`;
+    elRuleFeas.className = 'text-[9px] text-rose-400 ml-1';
+    elRuleBar.style.width = '2%';
+    elRuleBar.className = 'bg-slate-700 h-full transition-all duration-300';
+  }
+
+  // Market
+  const elMktLbl = document.getElementById('lblWMarket');
+  const elMktFeas = document.getElementById('feasMarket');
+  const elMktBar = document.getElementById('barWMarket');
+  elMktLbl.textContent = `W = ${w.market}`;
+  if (f.market) {
+    elMktFeas.textContent = '[解禁・成立]';
+    elMktFeas.className = 'text-[9px] text-amber-400 ml-1';
+    elMktBar.style.width = `${Math.max(0, (w.market / maxW) * 100)}%`;
+    elMktBar.className = 'bg-amber-400 h-full transition-all duration-300';
+  } else {
+    elMktFeas.textContent = `[不成立: L=${params.L}<50 又は deg=${params.degRate}>15]`;
+    elMktFeas.className = 'text-[9px] text-rose-400 ml-1';
+    elMktBar.style.width = '2%';
+    elMktBar.className = 'bg-slate-700 h-full transition-all duration-300';
+  }
+
+  // Algorithmic
+  const elAlgoLbl = document.getElementById('lblWAlgo');
+  const elAlgoFeas = document.getElementById('feasAlgo');
+  const elAlgoBar = document.getElementById('barWAlgo');
+  elAlgoLbl.textContent = `W = ${w.algorithmic}`;
+  if (f.algorithmic) {
+    elAlgoFeas.textContent = '[解禁・資本主義超克]';
+    elAlgoFeas.className = 'text-[9px] text-cyan-400 ml-1';
+    elAlgoBar.style.width = `${Math.max(0, (w.algorithmic / maxW) * 100)}%`;
+    elAlgoBar.className = 'bg-cyan-400 h-full transition-all duration-300';
+  } else {
+    elAlgoFeas.textContent = `[未解禁: L=${params.L}<100, ν=${params.verifiability}<80, 又は deg=${params.degRate}>5]`;
+    elAlgoFeas.className = 'text-[9px] text-slate-500 ml-1';
+    elAlgoBar.style.width = '2%';
+    elAlgoBar.className = 'bg-slate-700 h-full transition-all duration-300';
+  }
+}
+
+// ==========================================================================
+// CANVAS RENDERING (DUAL MODE: POPULATION & REGIME VIEW)
+// ==========================================================================
+
+function renderCanvas() {
+  ctx.fillStyle = '#090d16';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Global Regime Evaluation
+  const globalRegime = evalRegimes(params).bestRegime;
+
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      const i = idx(x, y);
+      const st = grid[i];
+      const px = x * CELL_PX;
+      const py = y * CELL_PX;
+      const inset = CELL_PX >= 5 ? 1 : 0;
+
+      if (viewMode === 'population') {
+        // --- 1. POPULATION VIEW ---
+        if (st === EMPTY) continue;
+        const str = stressGrid[i];
+        if (st === TERRORIST || st === BREAKTHROUGH || str > 0.6) {
+          ctx.fillStyle = st === TERRORIST ? 'rgba(244, 63, 94, 0.35)' :
+                          st === BREAKTHROUGH ? 'rgba(56, 189, 248, 0.35)' :
+                          'rgba(245, 158, 11, 0.25)';
+          ctx.fillRect(px - 1, py - 1, CELL_PX + 2, CELL_PX + 2);
+        }
+        ctx.fillStyle = POP_COLORS[st] || '#fff';
+        ctx.fillRect(px + inset, py + inset, CELL_PX - inset * 2, CELL_PX - inset * 2);
+        if (str > 0.2 && st !== TERRORIST) {
+          ctx.fillStyle = `rgba(244, 63, 94, ${str * 0.45})`;
+          ctx.fillRect(px + inset, py + inset, CELL_PX - inset * 2, CELL_PX - inset * 2);
+        }
+      } else {
+        // --- 2. REGIME & DOMINANCE HEATMAP VIEW ---
+        // In Regime view, we calculate the local micro-regime at each area
+        const str = stressGrid[i];
+        const n = countNeighbors(grid, x, y);
+        const localBully = n.total > 0 ? (n[BULLY] / n.total) : 0;
+        const cellRegime = evalRegimes(params, str, localBully).bestRegime;
+
+        if (st === EMPTY) {
+          // Subtle background tint of local dominant regime
+          ctx.fillStyle = (cellRegime === REGIME_VIOLENCE) ? 'rgba(225, 29, 72, 0.12)' :
+                          (cellRegime === REGIME_MARKET) ? 'rgba(251, 191, 36, 0.08)' :
+                          (cellRegime === REGIME_RULEOFLAW) ? 'rgba(16, 185, 129, 0.08)' :
+                          (cellRegime === REGIME_ALGORITHMIC) ? 'rgba(6, 182, 212, 0.10)' :
+                          'rgba(249, 115, 22, 0.08)';
+          ctx.fillRect(px, py, CELL_PX, CELL_PX);
+        } else {
+          // Living cells colored by their Dominant Regime
+          ctx.fillStyle = REGIME_COLORS[cellRegime] || '#fbbf24';
+          ctx.fillRect(px + inset, py + inset, CELL_PX - inset * 2, CELL_PX - inset * 2);
+
+          // Indicator for terrorists (violent friction)
+          if (st === TERRORIST) {
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(px + inset + 1, py + inset + 1, CELL_PX - inset * 2 - 2, CELL_PX - inset * 2 - 2);
+          }
+        }
+      }
+    }
+  }
+}
+
+function setViewMode(mode) {
+  viewMode = mode;
+  const tabPop = document.getElementById('tab-pop');
+  const tabReg = document.getElementById('tab-regime');
+  const dot = document.getElementById('canvasModeDot');
+  const lbl = document.getElementById('canvasModeLabel');
+  const popLeg = document.getElementById('popLegend');
+  const regLeg = document.getElementById('regimeLegend');
+
+  if (mode === 'population') {
+    tabPop.className = 'view-tab active px-3 py-1 rounded-md transition flex items-center gap-1.5 border border-transparent';
+    tabReg.className = 'view-tab px-3 py-1 rounded-md transition flex items-center gap-1.5 border border-transparent text-slate-400 hover:text-slate-200';
+    dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+    lbl.textContent = '母集団モード (Population View)';
+    popLeg.classList.remove('hidden');
+    regLeg.classList.add('hidden');
+  } else {
+    tabReg.className = 'view-tab active px-3 py-1 rounded-md transition flex items-center gap-1.5 border border-transparent';
+    tabPop.className = 'view-tab px-3 py-1 rounded-md transition flex items-center gap-1.5 border border-transparent text-slate-400 hover:text-slate-200';
+    dot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+    lbl.textContent = '統治相・優位体制モード (Regime Dominance View)';
+    popLeg.classList.add('hidden');
+    regLeg.classList.remove('hidden');
+  }
+  renderCanvas();
+}
+
+// ==========================================================================
+// SCENARIOS & PRESETS (SECTION 7 TRANSITIONS)
+// ==========================================================================
+
+function loadRegimeScenario(type) {
+  resetSimulation();
+  const cx = Math.floor(COLS / 2);
+  const cy = Math.floor(ROWS / 2);
+
+  if (type === 'violence_primitive') {
+    // Theorem 7.2: Extreme degradation forces violence
+    document.getElementById('paramL').value = 0;
+    document.getElementById('paramDegRate').value = 75;
+    document.getElementById('paramBullyS').value = 65;
+    applyModelParams();
+    setViewMode('regime');
+
+    for (let dy = -10; dy <= 10; dy++) {
+      for (let dx = -15; dx <= 15; dx++) {
+        if (Math.random() < 0.45) {
+          const i = idx(cx + dx, cy + dy);
+          grid[i] = Math.random() < 0.5 ? BULLY : CITIZEN;
+          stressGrid[i] = 0.5;
+        }
+      }
+    }
+    logEvent('danger', 'bg-rose-950 text-rose-300', 'Thm 7.2', '原始・アナーキー【暴力優位相】', 'degRate=75, L=0。制度記録が消滅し、成文法治も市場も不成立。暴力支配（W=20）のみが唯一成立します。');
+  }
+  else if (type === 'rule_of_law') {
+    // Theorem 7.3: Rule of Law emergence
+    document.getElementById('paramL').value = 35;
+    document.getElementById('paramDegRate').value = 18;
+    document.getElementById('paramCapRent').value = 40; // High rent depresses market
+    applyModelParams();
+    setViewMode('regime');
+
+    for (let dy = -8; dy <= 8; dy++) {
+      for (let dx = -12; dx <= 12; dx++) {
+        if (Math.random() < 0.35) {
+          const i = idx(cx + dx, cy + dy);
+          grid[i] = CITIZEN;
+          stressGrid[i] = 0.1;
+        }
+      }
+    }
+    logEvent('success', 'bg-emerald-950 text-emerald-300', 'Thm 7.3', '成文法治国家【法治優位相】', 'アーカイブ長 L=35, degRate=18。成文法治が解禁され、W(法治)=47 が暴力支配（W=20）を超克しました。');
+  }
+  else if (type === 'market_capitalism') {
+    // Market dominance
+    document.getElementById('paramL').value = 70;
+    document.getElementById('paramDegRate').value = 8;
+    document.getElementById('paramCapRent').value = 12;
+    document.getElementById('paramVerifiability').value = 50; // Algo not ready
+    applyModelParams();
+    setViewMode('regime');
+
+    for (let dy = -8; dy <= 8; dy++) {
+      for (let dx = -14; dx <= 14; dx++) {
+        if (Math.random() < 0.38) {
+          const i = idx(cx + dx, cy + dy);
+          grid[i] = CITIZEN;
+          stressGrid[i] = 0.15;
+        }
+      }
+    }
+    logEvent('warning', 'bg-amber-950 text-amber-300', 'Sec 7', '資本主義経済【市場経済優位相】', '信用履歴 L=70, degRate=8。低劣化と取引余剰により、W(市場)=80 が法治を凌駕し最大厚生を実現。');
+  }
+  else if (type === 'algorithmic_ai') {
+    // Theorem 7.4 & 7.5: Post-capitalism Algorithmic Dominance
+    document.getElementById('paramL').value = 120;
+    document.getElementById('paramDegRate').value = 3;
+    document.getElementById('paramVerifiability').value = 95;
+    document.getElementById('paramCapRent').value = 25;
+    applyModelParams();
+    setViewMode('regime');
+
+    for (let dy = -8; dy <= 8; dy++) {
+      for (let dx = -14; dx <= 14; dx++) {
+        if (Math.random() < 0.35) {
+          const i = idx(cx + dx, cy + dy);
+          grid[i] = Math.random() < 0.4 ? AI_SUPPORT : (Math.random() < 0.2 ? BREAKTHROUGH : CITIZEN);
+          stressGrid[i] = 0.05;
+        }
+      }
+    }
+    logEvent('info', 'bg-cyan-950 text-cyan-300', 'Thm 7.4', 'ポスト資本主義【アルゴリズム統治優位相】', 'L=120, ν=95, deg=3。暗号学的検証性により市場の独占レント搾取を超克し、最高福祉 W=224 に到達！');
+  }
+
+  renderCanvas();
+  updateMetricsAndRegimeUI();
+}
+
+function applyModelParams() {
+  params.L = parseInt(document.getElementById('paramL').value);
+  params.degRate = parseInt(document.getElementById('paramDegRate').value);
+  params.capitalistRent = parseInt(document.getElementById('paramCapRent').value);
+  params.verifiability = parseInt(document.getElementById('paramVerifiability').value);
+  params.alpha = parseInt(document.getElementById('paramAlpha').value) / 100;
+  params.bully_s = parseInt(document.getElementById('paramBullyS').value) / 100;
+
+  document.getElementById('dispParamL').textContent = params.L;
+  document.getElementById('dispDegRate').textContent = params.degRate;
+  document.getElementById('dispCapRent').textContent = params.capitalistRent;
+  document.getElementById('dispVerifiability').textContent = params.verifiability;
+  document.getElementById('dispAlpha').textContent = params.alpha.toFixed(2);
+  document.getElementById('dispBullyS').textContent = params.bully_s.toFixed(2);
+
+  updateMetricsAndRegimeUI();
+  renderCanvas();
+}
+
+// Log & History
+let historyData = { labels: [], citizen: [], bully: [], terrorist: [], ai: [], breakthru: [] };
+let timelineChart = null;
+
+function logEvent(type, badgeClass, thmTag, title, message) {
+  const box = document.getElementById('theoremLogBox');
+  const el = document.createElement('div');
+  el.className = 'p-2 rounded bg-slate-800/60 border border-slate-700/80 text-slate-300';
+  el.innerHTML = `
+    <div class="flex items-center justify-between mb-0.5">
+      <span class="badge-thm ${badgeClass}">${thmTag}</span>
+      <span class="text-slate-500 text-[9px]">Gen ${generation}</span>
+    </div>
+    <div class="font-semibold text-[10px] text-slate-200">${title}</div>
+    <p class="text-[9px] text-slate-400 mt-0.5 leading-relaxed">${message}</p>
+  `;
+  box.prepend(el);
+  if (box.children.length > 40) box.removeChild(box.lastChild);
+}
+
+function clearEventLogs() {
+  document.getElementById('theoremLogBox').innerHTML = `
+    <div class="text-slate-500 text-center py-6 text-[10px]">ログがクリアされました</div>
+  `;
+}
+
+// Interaction
+function togglePlay() {
+  initAudio();
+  isRunning = !isRunning;
+  document.getElementById('playIcon').textContent = isRunning ? '⏸' : '▶';
+  document.getElementById('playText').textContent = isRunning ? '一時停止' : '実行開始';
+  document.getElementById('stateIndicator').textContent = isRunning ? 'RUNNING' : 'PAUSED';
+  document.getElementById('stateIndicator').className = isRunning
+    ? 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700 animate-pulse'
+    : 'text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700';
+}
+function updateSpeed() {
+  const v = parseInt(document.getElementById('speedSlider').value);
+  document.getElementById('speedVal').textContent = v;
+  stepInterval = 1000 / v;
+}
+function resetSimulation() {
+  if (isRunning) togglePlay();
+  grid.fill(EMPTY); stressGrid.fill(0); zkGrid.fill(0);
+  generation = 0;
+  historyData = { labels: [], citizen: [], bully: [], terrorist: [], ai: [], breakthru: [] };
+  if (timelineChart) timelineChart.update();
+  renderCanvas();
+  updateMetricsAndRegimeUI();
+}
+function randomizeGrid() {
+  resetSimulation();
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      if (Math.random() < 0.28) {
+        const r = Math.random();
+        const i = idx(x, y);
+        if (r < 0.65) grid[i] = CITIZEN;
+        else if (r < 0.85) grid[i] = BULLY;
+        else if (r < 0.93) grid[i] = AI_SUPPORT;
+        else if (r < 0.98) grid[i] = TERRORIST;
+        else grid[i] = BREAKTHROUGH;
+        zkGrid[i] = Math.random() * 0.5;
+      }
+    }
+  }
+  renderCanvas();
+  updateMetricsAndRegimeUI();
+}
+function triggerExternalShock() {
+  initAudio();
+  playTone(85, 'sawtooth', 0.5, 0.2);
+  const overlay = document.getElementById('shockOverlay');
+  overlay.style.opacity = '1';
+  setTimeout(() => { overlay.style.opacity = '0'; }, 600);
+  for (let i = 0; i < grid.length; i++) {
+    if (grid[i] !== EMPTY && Math.random() < 0.25) {
+      grid[i] = EMPTY; stressGrid[i] = 0;
+    }
+  }
+  renderCanvas();
+  updateMetricsAndRegimeUI();
+}
+
+function openTheoremModal() { document.getElementById('theoremModal').classList.remove('hidden'); }
+function closeTheoremModal() { document.getElementById('theoremModal').classList.add('hidden'); }
+
+// Tooltip HUD
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const cx = Math.floor((e.clientX - rect.left) * scaleX / CELL_PX);
+  const cy = Math.floor((e.clientY - rect.top) * scaleY / CELL_PX);
+  const tt = document.getElementById('cellTooltip');
+
+  if (cx >= 0 && cx < COLS && cy >= 0 && cy < ROWS) {
+    const i = idx(cx, cy);
+    const st = grid[i];
+    if (st !== EMPTY) {
+      tt.classList.remove('hidden');
+      const boxRect = document.getElementById('canvasBox').getBoundingClientRect();
+      tt.style.left = `${Math.min(boxRect.width - 240, Math.max(10, e.clientX - boxRect.left + 15))}px`;
+      tt.style.top = `${Math.min(boxRect.height - 140, Math.max(10, e.clientY - boxRect.top + 15))}px`;
+
+      const names = { [CITIZEN]: 'Citizen', [BULLY]: 'Bully', [TERRORIST]: 'Terrorist', [AI_SUPPORT]: 'AI Support', [BREAKTHROUGH]: 'Breakthrough' };
+      document.getElementById('ttType').textContent = names[st];
+      document.getElementById('ttCoord').textContent = `(${cx}, ${cy})`;
+      document.getElementById('ttStress').textContent = stressGrid[i].toFixed(2);
+
+      const n = countNeighbors(grid, cx, cy);
+      const localBully = n.total > 0 ? (n[BULLY] / n.total) : 0;
+      const cellReg = evalRegimes(params, stressGrid[i], localBully).bestRegime;
+      document.getElementById('ttRegime').textContent = cellReg.toUpperCase();
+
+      const pay = computeCellPayoffs(st, stressGrid[i], zkGrid[i], n);
+      document.getElementById('ttPayCopy').textContent = (pay.pi_copy >= 0 ? '+' : '') + pay.pi_copy;
+      document.getElementById('ttPayTerror').textContent = (pay.pi_terror >= 0 ? '+' : '') + pay.pi_terror;
+      document.getElementById('ttTmin').textContent = pay.T_min;
+      return;
+    }
+  }
+  tt.classList.add('hidden');
+});
+canvas.addEventListener('mouseleave', () => { document.getElementById('cellTooltip').classList.add('hidden'); });
+
+// Chart Init
+function initTimelineChart() {
+  const chartCtx = document.getElementById('timelineChart').getContext('2d');
+  timelineChart = new Chart(chartCtx, {
+    type: 'line',
+    data: {
+      labels: historyData.labels,
+      datasets: [
+        { label: 'Citizen', data: historyData.citizen, borderColor: '#34d399', backgroundColor: 'rgba(52, 211, 153, 0.1)', fill: true, tension: 0.2, borderWidth: 1.5, pointRadius: 0 },
+        { label: 'Bully', data: historyData.bully, borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', fill: true, tension: 0.2, borderWidth: 1.5, pointRadius: 0 },
+        { label: 'Terrorist', data: historyData.terrorist, borderColor: '#f43f5e', backgroundColor: 'rgba(244, 63, 94, 0.1)', fill: true, tension: 0.2, borderWidth: 1.5, pointRadius: 0 },
+        { label: 'AI Support', data: historyData.ai, borderColor: '#818cf8', backgroundColor: 'rgba(129, 140, 248, 0.1)', fill: true, tension: 0.2, borderWidth: 1.5, pointRadius: 0 },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 0 },
+      plugins: {
+        legend: { display: true, position: 'top', labels: { color: '#94a3b8', font: { size: 9 }, boxWidth: 10, padding: 4 } }
+      },
+      scales: {
+        x: { display: false },
+        y: { display: true, grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#64748b', font: { size: 8 } } }
+      }
+    }
+  });
+}
+
+// Main Loop
+let fpsCount = 0, lastFpsTime = performance.now();
+function mainLoop(now) {
+  animFrameId = requestAnimationFrame(mainLoop);
+  fpsCount++;
+  if (now - lastFpsTime >= 1000) {
+    document.getElementById('hdrFps').textContent = fpsCount;
+    fpsCount = 0;
+    lastFpsTime = now;
+  }
+  if (isRunning && now - lastStepTime >= stepInterval) {
+    stepSimulation();
+    lastStepTime = now;
+  }
+  renderCanvas();
+}
+
+function initApp() {
+  resizeCanvas();
+  initTimelineChart();
+  applyModelParams();
+  randomizeGrid();
+  window.addEventListener('resize', resizeCanvas);
+  mainLoop(performance.now());
+}
+
+initApp();
+</script>
+</body>
+</html>

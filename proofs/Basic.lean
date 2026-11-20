@@ -1561,7 +1561,7 @@ structure GenericRegime where
   inclusivity    : Int  -- 包摂性・透明性 \alpha_{trans} \in [0, 100]
   rentCost       : Int  -- 独占レント・維持コスト歪み
   coordination   : Int  -- 協調・イノベーション余剰ボーナス
-  h_bounds       : 
+  h_bounds       :
     (0 ≤ degRate ∧ degRate ≤ 100) ∧
     (0 ≤ verifiability ∧ verifiability ≤ 100) ∧
     (0 ≤ inclusivity ∧ inclusivity ≤ 100) ∧
@@ -1584,9 +1584,9 @@ theorem generic_regime_competition_dominance
     (h_better_incl : regimeA.inclusivity ≥ regimeB.inclusivity)
     (h_lower_rent : regimeA.rentCost ≤ regimeB.rentCost)
     (h_higher_coord : regimeA.coordination ≥ regimeB.coordination)
-    (h_strict : regimeA.degRate < regimeB.degRate ∨ 
-                regimeA.verifiability + regimeA.inclusivity ≥ regimeB.verifiability + regimeB.inclusivity + 2 ∨ 
-                regimeA.rentCost < regimeB.rentCost ∨ 
+    (h_strict : regimeA.degRate < regimeB.degRate ∨
+                regimeA.verifiability + regimeA.inclusivity ≥ regimeB.verifiability + regimeB.inclusivity + 2 ∨
+                regimeA.rentCost < regimeB.rentCost ∨
                 regimeA.coordination > regimeB.coordination) :
     genericRegimeWelfare regimeA > genericRegimeWelfare regimeB := by
   unfold genericRegimeWelfare
@@ -2055,3 +2055,212 @@ def main : IO Unit := do
   IO.println s!"        統一適応度序列: W(Abiogenesis)={w_abio} < W(Genetic)={w_gene} < W(Capitalism)={w_capi} < W(Democracy)={w_demo} < W(TagCurrency)={w_tagc}"
   IO.println "======================================================================"
   IO.println " 全セクション (Sec 0〜11) の定理群が Lean 4 型検査により検証されました。"
+-- ============================================================================
+-- セクション 12: 技術フロンティア制約下の「評価明示度」と「評価結果の検索性」の最適制御
+-- ============================================================================
+
+/--
+  技術水準（techLevel）による上限制約を受けた上で、
+  評価管理者が「評価ルールの明示度（evalExplicitness）」と
+  「評価結果の他人からの検索性（evalSearchability）」を操作するガバナンス構造体
+-/
+structure TechBoundedSearchGovernance where
+  -- 技術フロンティア（外生・蓄積パラメータ）
+  techLevel         : Int  -- 情報保管・検索・検証技術水準 T_{tech} \in [0, 100]
+  -- 評価管理者による操作パラメータ（制御変数）
+  evalExplicitness  : Int  -- 多数の対象への評価ルールの明示度 \mu_{exp} \in [0, 100]
+  evalSearchability : Int  -- 評価結果の他人からの検索性 \sigma_{search} \in [0, 100]
+  -- 技術に制約される情報保管・検証パラメータ
+  archiveLen        : Int  -- 評価の長期保存期間 L \ge 0
+  degRate           : Int  -- 情報劣化率 \lambda_{deg} \in [0, 100]
+  verifiability     : Int  -- 暗号学的・制度的検証可能性 \nu \in [0, 100]
+  -- 社会的コスト・便益係数
+  baseSurplus       : Int  -- 基礎生産余剰 V_{base}
+  rentCost          : Int  -- 管理者の独占レント搾取コスト
+  -- 定義域および「技術による上限制約（Tech Frontier Constraints）」
+  h_bounds :
+    (0 ≤ techLevel ∧ techLevel ≤ 100) ∧
+    (0 ≤ evalExplicitness ∧ evalExplicitness ≤ 100) ∧
+    (0 ≤ evalSearchability ∧ evalSearchability ≤ 100) ∧
+    (0 ≤ degRate ∧ degRate ≤ 100) ∧
+    (0 ≤ verifiability ∧ verifiability ≤ 100) ∧
+    archiveLen ≥ 0 ∧ baseSurplus ≥ 0 ∧ rentCost ≥ 0
+  h_tech_constraints :
+    -- ① 保管技術が向上するほど劣化率の下限が下がる（長期劣化耐性）
+    degRate ≥ 100 - techLevel ∧
+    -- ② 長期保存期間 L の上限は技術水準に比例する
+    archiveLen ≤ 50 * techLevel ∧
+    -- ③ 検証可能性の上限は技術水準に制約される
+    verifiability ≤ techLevel ∧
+    -- ④ 多数の対象への評価ルールの明示度の上限は技術水準に制約される
+    evalExplicitness ≤ techLevel ∧
+    -- ⑤ 評価結果の他人からの検索性の上限は技術水準に制約される
+    evalSearchability ≤ techLevel
+  deriving Repr
+
+-- ----------------------------------------------------------------------------
+-- 明示度と検索性がもたらす便益（協調・マッチング）とコスト（ゲーミング・監視制裁）
+-- ----------------------------------------------------------------------------
+
+/-- 多数の対象への評価ルール明示化によるスケーラビリティ・協調便益: 2 * \mu_{exp} -/
+def explicitCoordinationGain (g : TechBoundedSearchGovernance) : Int :=
+  2 * g.evalExplicitness
+
+/-- 評価結果の他人からの検索性による取引・信用マッチング便益: 3 * \sigma_{search} -/
+def searchMatchingGain (g : TechBoundedSearchGovernance) : Int :=
+  3 * g.evalSearchability
+
+/-- ルール明示化に伴うゲーミング（評価ハック・見せかけのシグナリング）歪みコスト: \mu_{exp} -/
+def explicitGamingCost (g : TechBoundedSearchGovernance) : Int :=
+  g.evalExplicitness
+
+/-- 検索性向上に伴う監視・同調圧力・報復・デジタルタトゥーコスト: \sigma_{search} -/
+def searchSurveillanceCost (g : TechBoundedSearchGovernance) : Int :=
+  g.evalSearchability
+
+/--
+  技術制約下における評価システムの総合社会純厚生 W_{tech}:
+  基礎余剰 ＋ 明示化純便益(2\mu - \mu) ＋ 検索性純便益(3\sigma - \sigma) ＋ 検証性 － 劣化損失 － レント
+-/
+def techGovernanceWelfare (g : TechBoundedSearchGovernance) : Int :=
+  g.baseSurplus
+  + (explicitCoordinationGain g - explicitGamingCost g)
+  + (searchMatchingGain g - searchSurveillanceCost g)
+  + g.verifiability
+  - 2 * g.degRate
+  - g.rentCost
+
+-- ----------------------------------------------------------------------------
+-- 形式証明された定理群（すべて sorry なしで証明）
+-- ----------------------------------------------------------------------------
+
+/--
+  【定理 12.1】技術フロンティアによる検索性・明示度・保存期間の上限拘束定理:
+  情報保管・検索技術 techLevel が低い環境では、評価管理者がどれだけ検索性や明示度を
+  高めようと操作しても、techLevel を超えることはできず、劣化率も (100 - techLevel) 未満には
+  下げられない。
+-/
+theorem tech_bounds_search_and_explicitness
+    (g : TechBoundedSearchGovernance)
+    (T_cap : Int)
+    (h_low_tech : g.techLevel ≤ T_cap) :
+    g.evalSearchability ≤ T_cap ∧
+    g.evalExplicitness ≤ T_cap ∧
+    g.archiveLen ≤ 50 * T_cap ∧
+    g.degRate ≥ 100 - T_cap := by
+  have ⟨h_deg, h_arch, _, h_exp, h_search⟩ := g.h_tech_constraints
+  omega
+
+/--
+  【定理 12.2】技術向上に伴う「最大検索・最大明示ガバナンス」の厳密優位性定理:
+  技術レベルが低い旧体制（g_low）と、技術レベルが向上し（T_high > T_low）、
+  その新たな技術限界まで劣化率を下げ、明示度と検索性を引き上げた新体制（g_high）を比較すると、
+  同一のレント水準のもとで新体制の社会純厚生は旧体制を厳密に圧倒する。
+-/
+theorem higher_tech_with_max_search_dominates
+    (g_low g_high : TechBoundedSearchGovernance)
+    (h_same_base : g_low.baseSurplus = g_high.baseSurplus ∧ g_low.rentCost = g_high.rentCost)
+    (h_tech_up : g_high.techLevel > g_low.techLevel)
+    -- 新体制は技術限界まで劣化を抑え、明示度・検索性・検証性を引き上げている
+    (h_high_opt_deg : g_high.degRate = 100 - g_high.techLevel)
+    (h_high_opt_exp : g_high.evalExplicitness = g_high.techLevel)
+    (h_high_opt_search : g_high.evalSearchability = g_high.techLevel)
+    (h_high_opt_verif : g_high.verifiability = g_high.techLevel) :
+    techGovernanceWelfare g_high > techGovernanceWelfare g_low := by
+  unfold techGovernanceWelfare explicitCoordinationGain explicitGamingCost
+  unfold searchMatchingGain searchSurveillanceCost
+  have ⟨_, _, _, _, _⟩ := g_low.h_bounds
+  have ⟨h_low_deg, _, h_low_verif, h_low_exp, h_low_search⟩ := g_low.h_tech_constraints
+  omega
+
+/--
+  【定理 12.3】管理者の操作による「検索性の意図的抑制（プライバシー・忘却保護）」の合理性定理:
+  基本モデルでは検索性向上は純便益（3σ - σ = 2σ > 0）を生むが、
+  検索性が引き起こす追加的な同調圧力・報復・デジタルタトゥー外部性（extraStigmaCost）が
+  検索マッチングの純便益（2 * (σ_high - σ_low)）を上回る社会環境では、
+  管理者は技術的上限まで検索性を上げず、あえて検索性を低く制限する方が社会純厚生が高くなる。
+-/
+theorem manager_caps_searchability_when_stigma_high
+    (g_private g_public : TechBoundedSearchGovernance)
+    (extraStigmaCost : Int)
+    (h_same_others :
+      g_private.baseSurplus = g_public.baseSurplus ∧
+      g_private.evalExplicitness = g_public.evalExplicitness ∧
+      g_private.verifiability = g_public.verifiability ∧
+      g_private.degRate = g_public.degRate ∧
+      g_private.rentCost = g_public.rentCost)
+    (h_search_gap : g_public.evalSearchability > g_private.evalSearchability)
+    (h_stigma_exceeds : extraStigmaCost > 2 * (g_public.evalSearchability - g_private.evalSearchability)) :
+    techGovernanceWelfare g_private > techGovernanceWelfare g_public - extraStigmaCost := by
+  unfold techGovernanceWelfare explicitCoordinationGain explicitGamingCost
+  unfold searchMatchingGain searchSurveillanceCost
+  omega
+
+/--
+  【定理 12.4】体制間競争における「検索性操作と技術投資」による勝利条件:
+  移動コスト C_switch のもとで 2 つの評価体制（体制1 vs 体制2）が競争するとき、
+  体制2が技術向上と検索性・明示度の最適化によって厚生優位を築き、
+  その差が移動コスト C_switch を上回れば、体制1のロックインは崩壊し体制2が勝利する。
+-/
+theorem search_and_tech_advantage_wins_regime_competition
+    (g1 g2 : TechBoundedSearchGovernance)
+    (C_switch : Int)
+    (h_advantage : techGovernanceWelfare g2 - techGovernanceWelfare g1 > C_switch) :
+    ¬ regimeChoiceCondition (techGovernanceWelfare g1) (techGovernanceWelfare g2) C_switch := by
+  unfold regimeChoiceCondition
+  omega
+
+-- ----------------------------------------------------------------------------
+-- 数値検証シナリオと自動証明 (decide)
+-- ----------------------------------------------------------------------------
+
+/-- ① 低技術・口伝/紙台帳時代 (techLevel = 20): 劣化率が高く、検索性も明示度も20が限界 -/
+def sampleTechLowRegime : TechBoundedSearchGovernance where
+  techLevel := 20
+  evalExplicitness := 15
+  evalSearchability := 10
+  archiveLen := 500
+  degRate := 80
+  verifiability := 20
+  baseSurplus := 100
+  rentCost := 15
+  h_bounds := by decide
+  h_tech_constraints := by decide
+
+/-- ② 中技術・初期デジタル時代 (techLevel = 60): 検索性は向上したが管理者が意図的に検索性を抑制(30) -/
+def sampleTechMidPrivateRegime : TechBoundedSearchGovernance where
+  techLevel := 60
+  evalExplicitness := 55
+  evalSearchability := 30
+  archiveLen := 2500
+  degRate := 40
+  verifiability := 60
+  baseSurplus := 100
+  rentCost := 15
+  h_bounds := by decide
+  h_tech_constraints := by decide
+
+/-- ③ 高技術・分散台帳/高速検索時代 (techLevel = 95): 劣化率5、明示度95・検索性95のフル開放体制 -/
+def sampleTechHighOpenRegime : TechBoundedSearchGovernance where
+  techLevel := 95
+  evalExplicitness := 95
+  evalSearchability := 95
+  archiveLen := 4750
+  degRate := 5
+  verifiability := 95
+  baseSurplus := 100
+  rentCost := 15
+  h_bounds := by decide
+  h_tech_constraints := by decide
+
+/-- 具象検証: 技術レベルと検索性・明示度の向上による純厚生の厳密な段階的上昇と体制間勝利の自動証明 -/
+theorem sample_tech_search_evolution_valid :
+    techGovernanceWelfare sampleTechLowRegime < techGovernanceWelfare sampleTechMidPrivateRegime ∧
+    techGovernanceWelfare sampleTechMidPrivateRegime < techGovernanceWelfare sampleTechHighOpenRegime ∧
+    ¬ regimeChoiceCondition
+        (techGovernanceWelfare sampleTechLowRegime)
+        (techGovernanceWelfare sampleTechHighOpenRegime)
+        100 := by
+  unfold techGovernanceWelfare explicitCoordinationGain explicitGamingCost
+  unfold searchMatchingGain searchSurveillanceCost regimeChoiceCondition
+  decide
